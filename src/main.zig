@@ -35,60 +35,114 @@ const Connection = struct {
         try writer.interface.flush();
 
         var reader = self.stream.reader(&read_buffer);
-        const data = try reader.interface().takeDelimiterExclusive('\n');
+        const data = try reader.interface().takeDelimiterInclusive('\n');
 
         debug.print("{s}\n", .{data});
 
-        var integers = IntegerIter(ByteIter).new(ByteIter.new(&read_buffer));
+        var integers = IntegerIter.new(data);
 
-        const x = integers.next_inner();
-        debug.print("{}\n", .{x});
+        const x = try integers.next_inner();
+        const y = try integers.next_inner();
+        const z = try integers.next_inner();
+        debug.print("{}, {}, {}\n", .{ x, y, z });
     }
 };
 
-fn IntegerIter(comptime T: type) type {
-    requireIteratorOf(T, u8);
-    return struct {
-        const Self = @This();
+const IntegerIter = struct {
+    const Self = @This();
 
-        inner: T,
+    // TODO: Rename ?
+    inner: ByteIter,
 
-        pub fn new(inner: T) Self {
-            return Self{ .inner = inner };
+    pub fn new(slice: []const u8) Self {
+        return Self{ .inner = ByteIter.new(slice) };
+    }
+
+    const Error = error{ UnexpectedEof, UnexpectedChar, EmptyInteger };
+
+    fn next_inner(self: *Self) Error!i32 {
+        debug.print("NEXT\n", .{});
+
+        const sign: i32 = switch (try self.take_sign_char()) {
+            .negative => -1,
+            .positive, .none => 1,
+        };
+
+        var integer: i32 = 0;
+        var len: usize = 0;
+
+        while (true) : (len += 1) {
+            const char = try self.inner.peek();
+
+            const digit: i32 = switch (char) {
+                '0'...'9' => @intCast(char - '0'),
+                else => break,
+            };
+
+            self.inner.discardNext();
+            integer *= 10;
+            integer += digit;
         }
 
-        fn next_inner(self: *Self) i32 {
-            var integer: i32 = 0;
+        if (len == 0) {
+            // `^[-+]?$`
+            return Error.EmptyInteger;
+        }
 
+        integer *= sign;
+
+        // Decimal point and following digits
+        if (try self.inner.peek() == '.') {
+            self.inner.discardNext();
+
+            var is_integer = true; // Whether all decimal digits are '0'
             while (true) {
-                const char = self.inner.next() orelse {
-                    break;
-                };
-                debug.print(": {c}\n", .{char});
-
-                if (char == '.') {
-                    break;
+                switch (try self.inner.peek()) {
+                    '0' => {},
+                    '1'...'9' => is_integer = false,
+                    else => break,
                 }
-
-                if (!std.ascii.isDigit(char)) {
-                    break;
-                }
-
-                const digit = char - '0';
-                integer *= 10;
-                integer += digit;
+                self.inner.discardNext();
             }
 
-            return integer;
+            // Ensure number is always rounded down, NOT truncated
+            // Without this, `-1.3` would become `-1` (instead of `-2`)
+            if (!is_integer and sign < 0) {
+                integer -= 1;
+            }
         }
-    };
-}
+
+        const terminator = try self.inner.next();
+        _ = terminator;
+
+        return integer;
+    }
+
+    fn take_sign_char(self: *Self) Error!enum { negative, positive, none } {
+        switch (try self.inner.peek()) {
+            '-' => {
+                self.inner.discardNext();
+                return .negative;
+            },
+            '+' => {
+                self.inner.discardNext();
+                return .positive;
+            },
+            else => {
+                return .none;
+            },
+        }
+    }
+};
 
 const ByteIter = struct {
     const Self = @This();
 
     buffer: []const u8,
     index: usize,
+
+    // Responses must be properly terminated with '\n'.
+    const Error = error{UnexpectedEof};
 
     pub fn new(slice: []const u8) Self {
         return .{
@@ -97,20 +151,26 @@ const ByteIter = struct {
         };
     }
 
-    pub fn next(self: *Self) ?u8 {
+    pub fn next(self: *Self) Error!u8 {
         if (self.index >= self.buffer.len) {
-            return null;
+            return Error.UnexpectedEof;
         }
         const item = self.buffer[self.index];
+        debug.print(": {c}\n", .{item});
         self.index += 1;
         return item;
     }
 
-    pub fn peek(self: *const Self) ?u8 {
+    pub fn peek(self: *const Self) Error!u8 {
         if (self.index >= self.buffer.len) {
-            return null;
+            return Error.UnexpectedEof;
         }
         return self.buffer[self.index];
+    }
+
+    /// Asserts not at EOF.
+    pub fn discardNext(self: *Self) void {
+        _ = self.next() catch unreachable;
     }
 };
 
