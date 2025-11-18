@@ -24,20 +24,26 @@ const Connection = struct {
     }
 
     fn getPlayerPosition(self: *const Self) !void {
+        const WRITE_BUFFER_SIZE = "player.getPos()\n".len;
         const READ_BUFFER_SIZE = "12345.123456890,12345.123456890,12345.123456890\n".len * 2;
 
-        try self.stream.writer().writeAll("player.getPos()\n");
+        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
+        var read_buffer: [READ_BUFFER_SIZE]u8 = undefined;
 
-        var buffer: [READ_BUFFER_SIZE]u8 = undefined;
-        const data = try self.stream.reader().readUntilDelimiter(&buffer, '\n');
+        var writer = self.stream.writer(&write_buffer);
+        try writer.interface.writeAll("player.getPos()\n");
+        try writer.interface.flush();
+
+        var reader = self.stream.reader(&read_buffer);
+        const data = try reader.interface().takeDelimiterExclusive('\n');
 
         debug.print("{s}\n", .{data});
 
-        var reader = IntegerIter(PeekCopyIter(ByteIter))
+        var integers = IntegerIter(PeekCopyIter(ByteIter))
             .new(PeekCopyIter(ByteIter)
-            .new(ByteIter.new(&buffer)));
+            .new(ByteIter.new(&read_buffer)));
 
-        const x = reader.next_inner();
+        const x = integers.next_inner();
         debug.print("{}\n", .{x});
     }
 };
