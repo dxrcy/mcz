@@ -39,9 +39,7 @@ const Connection = struct {
 
         debug.print("{s}\n", .{data});
 
-        var integers = IntegerIter(PeekCopyIter(ByteIter))
-            .new(PeekCopyIter(ByteIter)
-            .new(ByteIter.new(&read_buffer)));
+        var integers = IntegerIter(ByteIter).new(ByteIter.new(&read_buffer));
 
         const x = integers.next_inner();
         debug.print("{}\n", .{x});
@@ -49,7 +47,7 @@ const Connection = struct {
 };
 
 fn IntegerIter(comptime T: type) type {
-    assertIteratorOf(T, u8);
+    requireIteratorOf(T, u8);
     return struct {
         const Self = @This();
 
@@ -86,36 +84,6 @@ fn IntegerIter(comptime T: type) type {
     };
 }
 
-fn PeekCopyIter(comptime T: type) type {
-    const Item = getIteratorItem(T);
-    return struct {
-        const Self = @This();
-
-        inner: T,
-        peeked: ?Item,
-
-        pub fn new(inner: T) Self {
-            return Self{ .inner = inner, .peeked = null };
-        }
-
-        pub fn next(self: *Self) ?Item {
-            if (self.peeked) |peeked| {
-                self.peeked = null;
-                return peeked;
-            }
-            return self.inner.next();
-        }
-
-        pub fn peek(self: *Self) ?Item {
-            if (self.peeked) |peeked| {
-                return peeked;
-            }
-            self.peeked = self.next();
-            return self.peeked;
-        }
-    };
-}
-
 const ByteIter = struct {
     const Self = @This();
 
@@ -137,9 +105,16 @@ const ByteIter = struct {
         self.index += 1;
         return item;
     }
+
+    pub fn peek(self: *const Self) ?u8 {
+        if (self.index >= self.buffer.len) {
+            return null;
+        }
+        return self.buffer[self.index];
+    }
 };
 
-fn assertIteratorOf(comptime T: type, comptime Item: type) void {
+fn requireIteratorOf(comptime T: type, comptime Item: type) void {
     if (getIteratorItem(T) != Item) {
         @compileError("iterator item type does not match");
     }
