@@ -13,7 +13,11 @@ pub fn main() !void {
     try conn.postToChat("Hello!");
     try conn.doCommand("say Hello!");
 
-    try conn.setPlayerPosition(.{ .x = 4, .y = 27, .z = 8 });
+    try conn.setPlayerPosition(.{
+        .x = 4,
+        .y = 87,
+        .z = 8,
+    });
 
     const player = try conn.getPlayerPosition();
     debug.print("player: {},{},{}\n", player);
@@ -33,8 +37,8 @@ pub fn main() !void {
     debug.print("block: {}:{}\n", block);
 
     var blocks = try conn.getBlocks(
-        .{ .x = 0, .y = 30, .z = 0 },
-        .{ .x = 1, .y = 31, .z = -1 },
+        .{ .x = 0, .y = 90, .z = 0 },
+        .{ .x = 1, .y = 91, .z = -1 },
     );
     debug.print("blocks:\n", .{});
     while (try blocks.next()) |b| {
@@ -51,8 +55,8 @@ pub fn main() !void {
     }
 
     try conn.setBlocks(
-        .{ .x = 3, .y = 30, .z = 0 },
-        .{ .x = 4, .y = 31, .z = -1 },
+        .{ .x = 3, .y = 90, .z = 0 },
+        .{ .x = 4, .y = 91, .z = -1 },
         .{ .id = 3, .mod = 0 },
     );
 }
