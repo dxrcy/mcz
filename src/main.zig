@@ -11,6 +11,7 @@ pub fn main() !void {
     conn.init();
 
     try conn.postToChat("Hello!");
+    try conn.doCommand("say Hello!");
 
     try conn.setPlayerPosition(.{ .x = 4, .y = 27, .z = 8 });
 
