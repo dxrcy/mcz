@@ -39,6 +39,12 @@ const Coordinate = struct {
     z: i32,
 };
 
+const Size = struct {
+    x: u32,
+    y: u32,
+    z: u32,
+};
+
 const Block = struct {
     // Fields must be larger than `u8` to hold newer blocks
     id: u32,
@@ -128,26 +134,28 @@ const Connection = struct {
 
     fn getBlocks(
         self: *Self,
-        corner_a: Coordinate,
-        corner_b: Coordinate,
+        origin: Coordinate,
+        bound: Coordinate,
     ) !BlockStream {
         try self.writer.interface.print(
             "world.getBlocksWithData({},{},{},{},{},{})\n",
             .{
-                corner_a.x, corner_a.y, corner_a.z,
-                corner_b.x, corner_b.y, corner_b.z,
+                origin.x, origin.y, origin.z,
+                bound.x,  bound.y,  bound.z,
             },
         );
         try self.writer.interface.flush();
 
-        const length = (@abs(corner_a.x - corner_b.x) + 1) *
-            (@abs(corner_a.y - corner_b.y) + 1) *
-            (@abs(corner_a.z - corner_b.z) + 1);
+        const size = Size{
+            .x = (@abs(origin.x - bound.x) + 1),
+            .y = (@abs(origin.y - bound.y) + 1),
+            .z = (@abs(origin.z - bound.z) + 1),
+        };
 
         return BlockStream{
             .connection = self,
-            .origin = corner_a,
-            .length = @intCast(length),
+            .origin = origin,
+            .size = size,
             .index = 0,
         };
     }
@@ -155,27 +163,29 @@ const Connection = struct {
     const BlockStream = struct {
         connection: *Connection,
         origin: Coordinate,
-        // TODO: Create `Size` struct
-        length: usize,
+        size: Size,
         index: usize,
 
         pub fn next(self: *BlockStream) !?Block {
-            if (self.index >= self.length) {
+            if (self.is_at_end()) {
                 return null;
             }
             self.index += 1;
 
-            const is_last = self.index >= self.length;
-            const delim: u8 = if (is_last) '\n' else ';';
+            const delim: u8 = if (self.is_at_end()) '\n' else ';';
 
             const data = try self.connection.reader.interface().takeDelimiterInclusive(delim);
-
             var integers = IntegerIter.new(data);
 
             const id = try integers.next(u32, ',');
             const mod = try integers.next(u32, delim);
 
             return Block{ .id = id, .mod = mod };
+        }
+
+        fn is_at_end(self: *const BlockStream) bool {
+            const length = self.size.x * self.size.y * self.size.z;
+            return self.index >= length;
         }
     };
 };
