@@ -13,7 +13,7 @@ pub fn main() !void {
     try conn.setPlayerPosition(.{ .x = 4, .y = 27, .z = 8 });
 
     const player = try conn.getPlayerPosition();
-    debug.print("{}, {}, {}\n", player);
+    debug.print("player: {},{},{}\n", player);
 
     const tile = mcz.Coordinate{
         .x = player.x,
@@ -24,17 +24,27 @@ pub fn main() !void {
     try conn.setBlock(tile, .{ .id = 1, .mod = 0 });
 
     const height = try conn.getHeight(player);
-    debug.print("{}\n", .{height});
+    debug.print("height: {}\n", .{height});
 
     const block = try conn.getBlock(tile);
-    debug.print("{}:{}\n", block);
+    debug.print("block: {}:{}\n", block);
 
     var blocks = try conn.getBlocks(
         .{ .x = 0, .y = 30, .z = 0 },
         .{ .x = 1, .y = 31, .z = -1 },
     );
+    debug.print("blocks:\n", .{});
     while (try blocks.next()) |b| {
         debug.print("  - {}:{}\n", b);
+    }
+
+    var heights = try conn.getHeights(
+        .{ .x = 0, .y = 0, .z = 0 },
+        .{ .x = 1, .y = 0, .z = -1 },
+    );
+    debug.print("heights:\n", .{});
+    while (try heights.next()) |h| {
+        debug.print("  - {}\n", .{h});
     }
 
     try conn.setBlocks(

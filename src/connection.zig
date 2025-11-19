@@ -148,6 +148,35 @@ pub const Connection = struct {
         const height = try integers.next(i32, '\n');
         return height;
     }
+
+    pub fn getHeights(
+        self: *Self,
+        origin: Coordinate,
+        bound: Coordinate,
+    ) !HeightStream {
+        try self.writer.interface.print(
+            "world.getHeights({},{},{},{})\n",
+            .{
+                origin.x, origin.z,
+                bound.x,  bound.z,
+            },
+        );
+        try self.writer.interface.flush();
+
+        // TODO: Create `Size2D` struct
+        const size = Size{
+            .x = (@abs(origin.x - bound.x) + 1),
+            .y = 1,
+            .z = (@abs(origin.z - bound.z) + 1),
+        };
+
+        return HeightStream{
+            .connection = self,
+            .origin = origin,
+            .size = size,
+            .index = 0,
+        };
+    }
 };
 
 pub const BlockStream = struct {
@@ -173,6 +202,35 @@ pub const BlockStream = struct {
         const mod = try integers.next(u32, delim);
 
         return Block{ .id = id, .mod = mod };
+    }
+
+    fn is_at_end(self: *const Self) bool {
+        const length = self.size.x * self.size.y * self.size.z;
+        return self.index >= length;
+    }
+};
+
+pub const HeightStream = struct {
+    const Self = @This();
+
+    connection: *Connection,
+    origin: Coordinate,
+    size: Size,
+    index: usize,
+
+    pub fn next(self: *Self) !?i32 {
+        if (self.is_at_end()) {
+            return null;
+        }
+        self.index += 1;
+
+        const delim: u8 = if (self.is_at_end()) '\n' else ',';
+
+        const data = try self.connection.reader.interface().takeDelimiterInclusive(delim);
+        var integers = IntegerIter.new(data);
+
+        const height = try integers.next(i32, delim);
+        return height;
     }
 
     fn is_at_end(self: *const Self) bool {
