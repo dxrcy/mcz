@@ -3,7 +3,7 @@ const debug = std.debug;
 const assert = std.debug.assert;
 const math = std.math;
 
-const mcz = @import("lib.zig");
+const mcz = @import("mcz");
 const Connection = mcz.Connection;
 
 pub fn main() !void {
