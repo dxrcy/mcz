@@ -46,8 +46,15 @@ pub const Connection = struct {
     }
 
     pub fn postToChat(self: *Self, message: []const u8) !void {
-        // FIXME: Sanitize message
-        try self.writer.interface.print("chat.post({s})\n", .{message});
+        try self.writer.interface.print("chat.post(", .{});
+        for (message) |char| {
+            // Server parses based on newlines (0x0a). All other characters,
+            // including comma, semicolon, and arbitrary UTF-8 should be safe.
+            try self.writer.interface.print("{c}", .{
+                if (char == '\n') ' ' else char,
+            });
+        }
+        try self.writer.interface.print(")\n", .{});
         try self.writer.interface.flush();
     }
 
