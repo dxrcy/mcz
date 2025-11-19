@@ -5,14 +5,43 @@ const net = std.net;
 const assert = std.debug.assert;
 
 pub fn main() !void {
-    const conn = try Connection.new();
-    try conn.getPlayerPosition();
+    var conn = try Connection.new();
+
+    try conn.setPlayerPosition(.{ .x = 4, .y = 27, .z = 8 });
+
+    const player = try conn.getPlayerPosition();
+    debug.print("{}, {}, {}\n", player);
+
+    const tile = Coordinate{
+        .x = player.x,
+        .y = player.y - 1,
+        .z = player.z,
+    };
+
+    try conn.setBlock(tile, .{ .id = 1, .mod = 0 });
+
+    const block = try conn.getBlock(tile);
+    debug.print("{}:{}\n", block);
 }
+
+const Coordinate = struct {
+    x: i32,
+    y: i32,
+    z: i32,
+};
+
+const Block = struct {
+    // Fields must be larger than `u8` to hold newer blocks
+    id: u32,
+    mod: u32,
+};
 
 const Connection = struct {
     stream: net.Stream,
 
     const Self = @This();
+
+    // TODO: Add explicit error variants to function returns
 
     pub fn new() !Self {
         const ip = "127.0.0.1";
@@ -24,9 +53,19 @@ const Connection = struct {
         return Self{ .stream = conn };
     }
 
-    fn getPlayerPosition(self: *const Self) !void {
+    const buffer_size = struct {
+        const COORDINATE = (COORDINATE_STR ++ "\n").len * 2;
+        const BLOCK = (BLOCK_STR ++ "\n").len * 2;
+
+        const FLOAT_STR = "12345.123456890";
+        const INTEGER_STR = "12345";
+        const COORDINATE_STR = FLOAT_STR ++ "," ++ FLOAT_STR ++ "," ++ FLOAT_STR;
+        const BLOCK_STR = INTEGER_STR ++ "," ++ INTEGER_STR;
+    };
+
+    fn getPlayerPosition(self: *Self) !Coordinate {
         const WRITE_BUFFER_SIZE = "player.getPos()\n".len;
-        const READ_BUFFER_SIZE = "12345.123456890,12345.123456890,12345.123456890\n".len * 2;
+        const READ_BUFFER_SIZE = buffer_size.COORDINATE;
 
         var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
         var read_buffer: [READ_BUFFER_SIZE]u8 = undefined;
@@ -38,14 +77,64 @@ const Connection = struct {
         var reader = self.stream.reader(&read_buffer);
         const data = try reader.interface().takeDelimiterInclusive('\n');
 
-        debug.print("{s}\n", .{data});
-
         var integers = IntegerIter.new(data);
 
         const x = try integers.next(i32, ',');
         const y = try integers.next(i32, ',');
         const z = try integers.next(i32, '\n');
-        debug.print("{}, {}, {}\n", .{ x, y, z });
+
+        return Coordinate{ .x = x, .y = y, .z = z };
+    }
+
+    fn setPlayerPosition(self: *Self, coordinate: Coordinate) !void {
+        const WRITE_BUFFER_SIZE = buffer_size.COORDINATE;
+
+        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
+
+        var writer = self.stream.writer(&write_buffer);
+        try writer.interface.print(
+            "player.setPos({},{},{})\n",
+            .{ coordinate.x, coordinate.y, coordinate.z },
+        );
+        try writer.interface.flush();
+    }
+
+    fn getBlock(self: *Self, coordinate: Coordinate) !Block {
+        const WRITE_BUFFER_SIZE = 10; // TODO:
+        const READ_BUFFER_SIZE = buffer_size.BLOCK;
+
+        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
+        var read_buffer: [READ_BUFFER_SIZE]u8 = undefined;
+
+        var writer = self.stream.writer(&write_buffer);
+        try writer.interface.print(
+            "world.getBlockWithData({},{},{})\n",
+            .{ coordinate.x, coordinate.y, coordinate.z },
+        );
+        try writer.interface.flush();
+
+        var reader = self.stream.reader(&read_buffer);
+        const data = try reader.interface().takeDelimiterInclusive('\n');
+
+        var integers = IntegerIter.new(data);
+
+        const id = try integers.next(u32, ',');
+        const mod = try integers.next(u32, '\n');
+
+        return Block{ .id = id, .mod = mod };
+    }
+
+    fn setBlock(self: *Self, coordinate: Coordinate, block: Block) !void {
+        const WRITE_BUFFER_SIZE = buffer_size.COORDINATE + buffer_size.BLOCK;
+
+        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
+
+        var writer = self.stream.writer(&write_buffer);
+        try writer.interface.print(
+            "world.setBlock({},{},{},{},{})\n",
+            .{ coordinate.x, coordinate.y, coordinate.z, block.id, block.mod },
+        );
+        try writer.interface.flush();
     }
 };
 
@@ -59,35 +148,44 @@ const IntegerIter = struct {
     }
 
     const Error = error{
+        Fail,
         UnexpectedEof,
         UnexpectedChar,
-        IncorrectTerminator,
-        EmptyInteger,
+        MalformedValue,
         Overflow,
     };
 
     pub fn next(
         self: *Self,
         comptime Int: type,
-        expected_terminator: u8,
+        expected_delim: u8,
     ) Error!Int {
         if (@typeInfo(Int) != .int) {
             @compileError("parameter must be an integer");
         }
 
-        debug.print("NEXT\n", .{});
-
-        const sign: Int = switch (try self.take_sign_char()) {
+        const sign: Intermediate(Int) = switch (try self.take_sign_char()) {
             .negative => -1,
             .positive, .none => 1,
         };
 
         const result = try self.take_digits_pre_decimal(Int);
+
         if (result.length == 0) {
-            return Error.EmptyInteger; // Not including sign character
+            // TODO: Move elsewhere?
+            if (std.mem.eql(
+                u8,
+                self.bytes.buffer[self.bytes.index..][0..4],
+                "Fail",
+            )) {
+                return Error.Fail;
+            }
+
+            // Empty, not including sign character
+            return Error.MalformedValue;
         }
 
-        var value = try math.mul(Int, result.value, sign);
+        var value = try math.mul(Intermediate(Int), result.value, sign);
 
         // Decimal point and following digits
         if (try self.bytes.peek() == '.') {
@@ -96,25 +194,37 @@ const IntegerIter = struct {
             // Ensure number is always rounded down, NOT truncated
             // Without this, `-1.3` would become `-1` (instead of `-2`)
             if (!is_integer and sign < 0) {
-                value = try math.sub(Int, value, 1);
+                value = try math.sub(Intermediate(Int), value, 1);
             }
         }
 
-        const terminator = try self.bytes.next();
-        if (terminator != expected_terminator) {
-            return Error.IncorrectTerminator;
+        const delim = try self.bytes.next();
+        if (delim != expected_delim) {
+            return Error.UnexpectedChar;
         }
 
-        return value;
+        return math.cast(Int, value) orelse Error.Overflow;
+    }
+
+    /// If `Int` is unsigned, return a larger signed integer with a sign bit.
+    fn Intermediate(comptime Int: type) type {
+        const info = @typeInfo(Int).int;
+        if (info.signedness == .signed) {
+            return Int;
+        }
+        return @Type(std.builtin.Type{ .int = .{
+            .bits = info.bits + 1,
+            .signedness = .signed,
+        } });
     }
 
     /// Parses base-10 integer.
     /// Stops before first non-digit character, including decimal point.
     fn take_digits_pre_decimal(self: *Self, comptime Int: type) Error!struct {
-        value: Int,
+        value: Intermediate(Int),
         length: usize,
     } {
-        var value: Int = 0;
+        var value: Intermediate(Int) = 0;
         var length: usize = 0;
 
         while (true) : (length += 1) {
@@ -127,8 +237,8 @@ const IntegerIter = struct {
 
             self.bytes.discardNext();
 
-            value = try math.mul(Int, value, 10);
-            value = try math.add(Int, value, digit);
+            value = try math.mul(Intermediate(Int), value, 10);
+            value = try math.add(Intermediate(Int), value, digit);
         }
 
         return .{ .value = value, .length = length };
@@ -187,7 +297,6 @@ const ByteIter = struct {
             return Error.UnexpectedEof;
         }
         const item = self.buffer[self.index];
-        debug.print(": {c}\n", .{item});
         self.index += 1;
         return item;
     }
@@ -204,27 +313,3 @@ const ByteIter = struct {
         _ = self.next() catch unreachable;
     }
 };
-
-fn requireIteratorOf(comptime T: type, comptime Item: type) void {
-    if (getIteratorItem(T) != Item) {
-        @compileError("iterator item type does not match");
-    }
-}
-
-fn getIteratorItem(comptime T: type) type {
-    if (@typeInfo(T) != .@"struct") {
-        @compileError("iterator type is not a struct");
-    }
-    if (!@hasDecl(T, "next")) {
-        @compileError("iterator type does not contain `next` declaration");
-    }
-    const next = switch (@typeInfo(@TypeOf(T.next))) {
-        .@"fn" => |next| next,
-        else => @compileError("iterator `next` is not a function"),
-    };
-    const optional = switch (@typeInfo(next.return_type orelse void)) {
-        .optional => |optional| optional,
-        else => @compileError("iterator `next` function does not return an optional"),
-    };
-    return optional.child;
-}
