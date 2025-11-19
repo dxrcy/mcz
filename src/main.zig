@@ -1,5 +1,6 @@
 const std = @import("std");
 const debug = std.debug;
+const math = std.math;
 const net = std.net;
 const Thread = std.Thread;
 
@@ -86,8 +87,7 @@ const IntegerIter = struct {
             return Error.EmptyInteger; // Not including sign character
         }
 
-        // FIXME: Handle overflow
-        var value = result.value * sign;
+        var value = try math.mul(Int, result.value, sign);
 
         // Decimal point and following digits
         if (try self.inner.peek() == '.') {
@@ -96,8 +96,7 @@ const IntegerIter = struct {
             // Ensure number is always rounded down, NOT truncated
             // Without this, `-1.3` would become `-1` (instead of `-2`)
             if (!is_integer and sign < 0) {
-                // FIXME: Handle overflow
-                value -= 1;
+                value = try math.sub(Int, value, 1);
             }
         }
 
@@ -127,10 +126,9 @@ const IntegerIter = struct {
             };
 
             self.inner.discardNext();
-            // FIXME: Handle overflow
-            value *= 10;
-            // FIXME: Handle overflow
-            value += digit;
+
+            value = try math.mul(Int, value, 10);
+            value = try math.add(Int, value, digit);
         }
 
         return .{ .value = value, .length = length };
