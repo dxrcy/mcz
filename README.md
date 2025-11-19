@@ -15,4 +15,13 @@ pub fn main() !void {
 }
 ```
 
+# Example
+
+Assumes server is running and Zig 0.15.1 is installed.
+
+```zig
+git clone https://github.com/dxrcy/mcz
+cd mcz/example
+zig build run
+```
 
