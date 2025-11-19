@@ -23,6 +23,14 @@ pub fn main() !void {
 
     const block = try conn.getBlock(tile);
     debug.print("{}:{}\n", block);
+
+    var blocks = try conn.getBlocks(
+        .{ .x = 0, .y = 30, .z = 0 },
+        .{ .x = 1, .y = 31, .z = -1 },
+    );
+    while (try blocks.next()) |b| {
+        debug.print("  - {}:{}\n", b);
+    }
 }
 
 const Coordinate = struct {
@@ -117,6 +125,59 @@ const Connection = struct {
         );
         try self.writer.interface.flush();
     }
+
+    fn getBlocks(
+        self: *Self,
+        corner_a: Coordinate,
+        corner_b: Coordinate,
+    ) !BlockStream {
+        try self.writer.interface.print(
+            "world.getBlocksWithData({},{},{},{},{},{})\n",
+            .{
+                corner_a.x, corner_a.y, corner_a.z,
+                corner_b.x, corner_b.y, corner_b.z,
+            },
+        );
+        try self.writer.interface.flush();
+
+        const length = (@abs(corner_a.x - corner_b.x) + 1) *
+            (@abs(corner_a.y - corner_b.y) + 1) *
+            (@abs(corner_a.z - corner_b.z) + 1);
+
+        return BlockStream{
+            .connection = self,
+            .origin = corner_a,
+            .length = @intCast(length),
+            .index = 0,
+        };
+    }
+
+    const BlockStream = struct {
+        connection: *Connection,
+        origin: Coordinate,
+        // TODO: Create `Size` struct
+        length: usize,
+        index: usize,
+
+        pub fn next(self: *BlockStream) !?Block {
+            if (self.index >= self.length) {
+                return null;
+            }
+            self.index += 1;
+
+            const is_last = self.index >= self.length;
+            const delim: u8 = if (is_last) '\n' else ';';
+
+            const data = try self.connection.reader.interface().takeDelimiterInclusive(delim);
+
+            var integers = IntegerIter.new(data);
+
+            const id = try integers.next(u32, ',');
+            const mod = try integers.next(u32, delim);
+
+            return Block{ .id = id, .mod = mod };
+        }
+    };
 };
 
 const IntegerIter = struct {
