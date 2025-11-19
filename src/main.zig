@@ -6,6 +6,7 @@ const assert = std.debug.assert;
 
 pub fn main() !void {
     var conn = try Connection.new();
+    conn.init();
 
     try conn.setPlayerPosition(.{ .x = 4, .y = 27, .z = 8 });
 
@@ -37,12 +38,21 @@ const Block = struct {
 };
 
 const Connection = struct {
-    stream: net.Stream,
-
     const Self = @This();
+
+    const WRITE_BUFFER_SIZE = 1024;
+    const READ_BUFFER_SIZE = 1024;
+
+    stream: net.Stream,
+    writer: net.Stream.Writer,
+    reader: net.Stream.Reader,
+    write_buffer: [WRITE_BUFFER_SIZE]u8,
+    read_buffer: [READ_BUFFER_SIZE]u8,
 
     // TODO: Add explicit error variants to function returns
 
+    /// Must call `init` after creation, to initialize writer/reader with
+    /// correct internal references.
     pub fn new() !Self {
         const ip = "127.0.0.1";
         const port = 4711;
@@ -50,91 +60,62 @@ const Connection = struct {
 
         const conn = try net.tcpConnectToAddress(addr);
 
-        return Self{ .stream = conn };
+        return Self{
+            .stream = conn,
+            .writer = undefined,
+            .reader = undefined,
+            .write_buffer = undefined,
+            .read_buffer = undefined,
+        };
     }
 
-    const buffer_size = struct {
-        const COORDINATE = (COORDINATE_STR ++ "\n").len * 2;
-        const BLOCK = (BLOCK_STR ++ "\n").len * 2;
-
-        const FLOAT_STR = "12345.123456890";
-        const INTEGER_STR = "12345";
-        const COORDINATE_STR = FLOAT_STR ++ "," ++ FLOAT_STR ++ "," ++ FLOAT_STR;
-        const BLOCK_STR = INTEGER_STR ++ "," ++ INTEGER_STR;
-    };
+    pub fn init(self: *Self) void {
+        self.writer = self.stream.writer(&self.write_buffer);
+        self.reader = self.stream.reader(&self.read_buffer);
+    }
 
     fn getPlayerPosition(self: *Self) !Coordinate {
-        const WRITE_BUFFER_SIZE = "player.getPos()\n".len;
-        const READ_BUFFER_SIZE = buffer_size.COORDINATE;
+        try self.writer.interface.writeAll("player.getPos()\n");
+        try self.writer.interface.flush();
 
-        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
-        var read_buffer: [READ_BUFFER_SIZE]u8 = undefined;
-
-        var writer = self.stream.writer(&write_buffer);
-        try writer.interface.writeAll("player.getPos()\n");
-        try writer.interface.flush();
-
-        var reader = self.stream.reader(&read_buffer);
-        const data = try reader.interface().takeDelimiterInclusive('\n');
-
+        const data = try self.reader.interface().takeDelimiterInclusive('\n');
         var integers = IntegerIter.new(data);
 
         const x = try integers.next(i32, ',');
         const y = try integers.next(i32, ',');
         const z = try integers.next(i32, '\n');
-
         return Coordinate{ .x = x, .y = y, .z = z };
     }
 
     fn setPlayerPosition(self: *Self, coordinate: Coordinate) !void {
-        const WRITE_BUFFER_SIZE = buffer_size.COORDINATE;
-
-        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
-
-        var writer = self.stream.writer(&write_buffer);
-        try writer.interface.print(
+        try self.writer.interface.print(
             "player.setPos({},{},{})\n",
             .{ coordinate.x, coordinate.y, coordinate.z },
         );
-        try writer.interface.flush();
+        try self.writer.interface.flush();
     }
 
     fn getBlock(self: *Self, coordinate: Coordinate) !Block {
-        const WRITE_BUFFER_SIZE = 10; // TODO:
-        const READ_BUFFER_SIZE = buffer_size.BLOCK;
-
-        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
-        var read_buffer: [READ_BUFFER_SIZE]u8 = undefined;
-
-        var writer = self.stream.writer(&write_buffer);
-        try writer.interface.print(
+        try self.writer.interface.print(
             "world.getBlockWithData({},{},{})\n",
             .{ coordinate.x, coordinate.y, coordinate.z },
         );
-        try writer.interface.flush();
+        try self.writer.interface.flush();
 
-        var reader = self.stream.reader(&read_buffer);
-        const data = try reader.interface().takeDelimiterInclusive('\n');
-
+        const data = try self.reader.interface().takeDelimiterInclusive('\n');
         var integers = IntegerIter.new(data);
 
         const id = try integers.next(u32, ',');
         const mod = try integers.next(u32, '\n');
-
         return Block{ .id = id, .mod = mod };
     }
 
     fn setBlock(self: *Self, coordinate: Coordinate, block: Block) !void {
-        const WRITE_BUFFER_SIZE = buffer_size.COORDINATE + buffer_size.BLOCK;
-
-        var write_buffer: [WRITE_BUFFER_SIZE]u8 = undefined;
-
-        var writer = self.stream.writer(&write_buffer);
-        try writer.interface.print(
+        try self.writer.interface.print(
             "world.setBlock({},{},{},{},{})\n",
             .{ coordinate.x, coordinate.y, coordinate.z, block.id, block.mod },
         );
-        try writer.interface.flush();
+        try self.writer.interface.flush();
     }
 };
 
