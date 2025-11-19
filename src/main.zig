@@ -33,4 +33,10 @@ pub fn main() !void {
     while (try blocks.next()) |b| {
         debug.print("  - {}:{}\n", b);
     }
+
+    try conn.setBlocks(
+        .{ .x = 3, .y = 30, .z = 0 },
+        .{ .x = 4, .y = 31, .z = -1 },
+        .{ .id = 3, .mod = 0 },
+    );
 }

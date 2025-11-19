@@ -116,6 +116,23 @@ pub const Connection = struct {
             .index = 0,
         };
     }
+
+    pub fn setBlocks(
+        self: *Self,
+        origin: Coordinate,
+        bound: Coordinate,
+        block: Block,
+    ) !void {
+        try self.writer.interface.print(
+            "world.setBlocks({},{},{},{},{},{},{},{})\n",
+            .{
+                origin.x, origin.y,  origin.z,
+                bound.x,  bound.y,   bound.z,
+                block.id, block.mod,
+            },
+        );
+        try self.writer.interface.flush();
+    }
 };
 
 pub const BlockStream = struct {
