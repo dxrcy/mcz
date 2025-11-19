@@ -5,10 +5,15 @@ const math = std.math;
 pub const IntegerIter = struct {
     const Self = @This();
 
-    bytes: ByteIter,
+    buffer: []const u8,
+    index: usize,
 
+    /// Requires that slice is properly terminated with appropriate delimiter.
     pub fn new(slice: []const u8) Self {
-        return Self{ .bytes = ByteIter.new(slice) };
+        return Self{
+            .buffer = slice,
+            .index = 0,
+        };
     }
 
     const Error = error{
@@ -18,6 +23,20 @@ pub const IntegerIter = struct {
         MalformedValue,
         Overflow,
     };
+
+    /// Does not consume / increase index.
+    fn nextByte(self: *const Self) Error!u8 {
+        if (self.index >= self.buffer.len) {
+            return Error.UnexpectedEof;
+        }
+        return self.buffer[self.index];
+    }
+
+    /// Asserts not at EOF.
+    fn advanceByte(self: *Self) void {
+        _ = self.nextByte() catch unreachable;
+        self.index += 1;
+    }
 
     pub fn next(
         self: *Self,
@@ -39,7 +58,7 @@ pub const IntegerIter = struct {
             // TODO: Move elsewhere?
             if (std.mem.eql(
                 u8,
-                self.bytes.buffer[self.bytes.index..][0..4],
+                self.buffer[self.index..][0..4],
                 "Fail",
             )) {
                 return Error.Fail;
@@ -52,8 +71,8 @@ pub const IntegerIter = struct {
         var value = try math.mul(Intermediate(Int), result.value, sign);
 
         // Decimal point and following digits
-        if (try self.bytes.peek() == '.') {
-            self.bytes.discardNext();
+        if (try self.nextByte() == '.') {
+            self.advanceByte();
             const is_integer = try self.take_digits_post_decimal();
             // Ensure number is always rounded down, NOT truncated
             // Without this, `-1.3` would become `-1` (instead of `-2`)
@@ -62,7 +81,8 @@ pub const IntegerIter = struct {
             }
         }
 
-        const delim = try self.bytes.next();
+        const delim = try self.nextByte();
+        self.advanceByte();
         if (delim != expected_delim) {
             return Error.UnexpectedChar;
         }
@@ -92,14 +112,14 @@ pub const IntegerIter = struct {
         var length: usize = 0;
 
         while (true) : (length += 1) {
-            const char = try self.bytes.peek();
+            const char = try self.nextByte();
 
             const digit: Int = switch (char) {
                 '0'...'9' => @intCast(char - '0'),
                 else => break,
             };
 
-            self.bytes.discardNext();
+            self.advanceByte();
 
             value = try math.mul(Intermediate(Int), value, 10);
             value = try math.add(Intermediate(Int), value, digit);
@@ -113,67 +133,29 @@ pub const IntegerIter = struct {
     fn take_digits_post_decimal(self: *Self) Error!bool {
         var is_integer = true;
         while (true) {
-            switch (try self.bytes.peek()) {
+            switch (try self.nextByte()) {
                 '0' => {},
                 '1'...'9' => is_integer = false,
                 else => break,
             }
-            self.bytes.discardNext();
+            self.advanceByte();
         }
         return is_integer;
     }
 
     fn take_sign_char(self: *Self) Error!enum { negative, positive, none } {
-        switch (try self.bytes.peek()) {
+        switch (try self.nextByte()) {
             '-' => {
-                self.bytes.discardNext();
+                self.advanceByte();
                 return .negative;
             },
             '+' => {
-                self.bytes.discardNext();
+                self.advanceByte();
                 return .positive;
             },
             else => {
                 return .none;
             },
         }
-    }
-};
-
-const ByteIter = struct {
-    const Self = @This();
-
-    buffer: []const u8,
-    index: usize,
-
-    // Responses must be properly terminated with '\n'.
-    const Error = error{UnexpectedEof};
-
-    pub fn new(slice: []const u8) Self {
-        return .{
-            .buffer = slice,
-            .index = 0,
-        };
-    }
-
-    pub fn next(self: *Self) Error!u8 {
-        if (self.index >= self.buffer.len) {
-            return Error.UnexpectedEof;
-        }
-        const item = self.buffer[self.index];
-        self.index += 1;
-        return item;
-    }
-
-    pub fn peek(self: *const Self) Error!u8 {
-        if (self.index >= self.buffer.len) {
-            return Error.UnexpectedEof;
-        }
-        return self.buffer[self.index];
-    }
-
-    /// Asserts not at EOF.
-    pub fn discardNext(self: *Self) void {
-        _ = self.next() catch unreachable;
     }
 };
