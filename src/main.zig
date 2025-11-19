@@ -41,9 +41,9 @@ const Connection = struct {
 
         var integers = IntegerIter.new(data);
 
-        const x = try integers.next_inner();
-        const y = try integers.next_inner();
-        const z = try integers.next_inner();
+        const x = try integers.next(i32, ',');
+        const y = try integers.next(i32, ',');
+        const z = try integers.next(i32, '\n');
         debug.print("{}, {}, {}\n", .{ x, y, z });
     }
 };
@@ -58,64 +58,97 @@ const IntegerIter = struct {
         return Self{ .inner = ByteIter.new(slice) };
     }
 
-    const Error = error{ UnexpectedEof, UnexpectedChar, EmptyInteger };
+    const Error = error{
+        UnexpectedEof,
+        UnexpectedChar,
+        IncorrectTerminator,
+        EmptyInteger,
+        Overflow,
+    };
 
-    fn next_inner(self: *Self) Error!i32 {
+    pub fn next(
+        self: *Self,
+        comptime Int: type,
+        expected_terminator: u8,
+    ) Error!Int {
+
+        // TODO: Static assert `Int` is sensible
+
         debug.print("NEXT\n", .{});
 
-        const sign: i32 = switch (try self.take_sign_char()) {
+        const sign: Int = switch (try self.take_sign_char()) {
             .negative => -1,
             .positive, .none => 1,
         };
 
-        var integer: i32 = 0;
-        var len: usize = 0;
+        const result = try self.take_digits_pre_decimal(Int);
+        if (result.length == 0) {
+            return Error.EmptyInteger; // Not including sign character
+        }
 
-        while (true) : (len += 1) {
+        // FIXME: Handle overflow
+        var value = result.value * sign;
+
+        // Decimal point and following digits
+        if (try self.inner.peek() == '.') {
+            self.inner.discardNext();
+            const is_integer = try self.take_digits_post_decimal();
+            // Ensure number is always rounded down, NOT truncated
+            // Without this, `-1.3` would become `-1` (instead of `-2`)
+            if (!is_integer and sign < 0) {
+                // FIXME: Handle overflow
+                value -= 1;
+            }
+        }
+
+        const terminator = try self.inner.next();
+        if (terminator != expected_terminator) {
+            return Error.IncorrectTerminator;
+        }
+
+        return value;
+    }
+
+    /// Parses base-10 integer.
+    /// Stops before first non-digit character, including decimal point.
+    fn take_digits_pre_decimal(self: *Self, comptime Int: type) Error!struct {
+        value: Int,
+        length: usize,
+    } {
+        var value: Int = 0;
+        var length: usize = 0;
+
+        while (true) : (length += 1) {
             const char = try self.inner.peek();
 
-            const digit: i32 = switch (char) {
+            const digit: Int = switch (char) {
                 '0'...'9' => @intCast(char - '0'),
                 else => break,
             };
 
             self.inner.discardNext();
-            integer *= 10;
-            integer += digit;
+            // FIXME: Handle overflow
+            value *= 10;
+            // FIXME: Handle overflow
+            value += digit;
         }
 
-        if (len == 0) {
-            // `^[-+]?$`
-            return Error.EmptyInteger;
-        }
+        return .{ .value = value, .length = length };
+    }
 
-        integer *= sign;
-
-        // Decimal point and following digits
-        if (try self.inner.peek() == '.') {
+    /// Returns `true` if any digits are non-zero, i.e. value is not an integer.
+    /// Stops before first non-digit character.
+    fn take_digits_post_decimal(self: *Self) Error!bool {
+        var is_integer = true;
+        while (true) {
+            switch (try self.inner.peek()) {
+                '0' => {},
+                '1'...'9' => is_integer = false,
+                else => break,
+            }
             self.inner.discardNext();
-
-            var is_integer = true; // Whether all decimal digits are '0'
-            while (true) {
-                switch (try self.inner.peek()) {
-                    '0' => {},
-                    '1'...'9' => is_integer = false,
-                    else => break,
-                }
-                self.inner.discardNext();
-            }
-
-            // Ensure number is always rounded down, NOT truncated
-            // Without this, `-1.3` would become `-1` (instead of `-2`)
-            if (!is_integer and sign < 0) {
-                integer -= 1;
-            }
         }
-
-        const terminator = try self.inner.next();
-        _ = terminator;
-
-        return integer;
+        return is_integer;
     }
 
     fn take_sign_char(self: *Self) Error!enum { negative, positive, none } {
