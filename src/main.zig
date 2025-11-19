@@ -2,7 +2,7 @@ const std = @import("std");
 const debug = std.debug;
 const math = std.math;
 const net = std.net;
-const Thread = std.Thread;
+const assert = std.debug.assert;
 
 pub fn main() !void {
     const conn = try Connection.new();
@@ -52,11 +52,10 @@ const Connection = struct {
 const IntegerIter = struct {
     const Self = @This();
 
-    // TODO: Rename ?
-    inner: ByteIter,
+    bytes: ByteIter,
 
     pub fn new(slice: []const u8) Self {
-        return Self{ .inner = ByteIter.new(slice) };
+        return Self{ .bytes = ByteIter.new(slice) };
     }
 
     const Error = error{
@@ -72,8 +71,9 @@ const IntegerIter = struct {
         comptime Int: type,
         expected_terminator: u8,
     ) Error!Int {
-
-        // TODO: Static assert `Int` is sensible
+        if (@typeInfo(Int) != .int) {
+            @compileError("parameter must be an integer");
+        }
 
         debug.print("NEXT\n", .{});
 
@@ -90,8 +90,8 @@ const IntegerIter = struct {
         var value = try math.mul(Int, result.value, sign);
 
         // Decimal point and following digits
-        if (try self.inner.peek() == '.') {
-            self.inner.discardNext();
+        if (try self.bytes.peek() == '.') {
+            self.bytes.discardNext();
             const is_integer = try self.take_digits_post_decimal();
             // Ensure number is always rounded down, NOT truncated
             // Without this, `-1.3` would become `-1` (instead of `-2`)
@@ -100,7 +100,7 @@ const IntegerIter = struct {
             }
         }
 
-        const terminator = try self.inner.next();
+        const terminator = try self.bytes.next();
         if (terminator != expected_terminator) {
             return Error.IncorrectTerminator;
         }
@@ -118,14 +118,14 @@ const IntegerIter = struct {
         var length: usize = 0;
 
         while (true) : (length += 1) {
-            const char = try self.inner.peek();
+            const char = try self.bytes.peek();
 
             const digit: Int = switch (char) {
                 '0'...'9' => @intCast(char - '0'),
                 else => break,
             };
 
-            self.inner.discardNext();
+            self.bytes.discardNext();
 
             value = try math.mul(Int, value, 10);
             value = try math.add(Int, value, digit);
@@ -139,24 +139,24 @@ const IntegerIter = struct {
     fn take_digits_post_decimal(self: *Self) Error!bool {
         var is_integer = true;
         while (true) {
-            switch (try self.inner.peek()) {
+            switch (try self.bytes.peek()) {
                 '0' => {},
                 '1'...'9' => is_integer = false,
                 else => break,
             }
-            self.inner.discardNext();
+            self.bytes.discardNext();
         }
         return is_integer;
     }
 
     fn take_sign_char(self: *Self) Error!enum { negative, positive, none } {
-        switch (try self.inner.peek()) {
+        switch (try self.bytes.peek()) {
             '-' => {
-                self.inner.discardNext();
+                self.bytes.discardNext();
                 return .negative;
             },
             '+' => {
-                self.inner.discardNext();
+                self.bytes.discardNext();
                 return .positive;
             },
             else => {
