@@ -23,6 +23,9 @@ pub fn main() !void {
 
     try conn.setBlock(tile, .{ .id = 1, .mod = 0 });
 
+    const height = try conn.getHeight(player);
+    debug.print("{}\n", .{height});
+
     const block = try conn.getBlock(tile);
     debug.print("{}:{}\n", block);
 

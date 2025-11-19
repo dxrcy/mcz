@@ -133,6 +133,21 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
     }
+
+    // TODO: Create `Coordinate2D` struct
+    pub fn getHeight(self: *Self, coordinate: Coordinate) !i32 {
+        try self.writer.interface.print(
+            "world.getHeight({},{})\n",
+            .{ coordinate.x, coordinate.z },
+        );
+        try self.writer.interface.flush();
+
+        const data = try self.reader.interface().takeDelimiterInclusive('\n');
+        var integers = IntegerIter.new(data);
+
+        const height = try integers.next(i32, '\n');
+        return height;
+    }
 };
 
 pub const BlockStream = struct {
