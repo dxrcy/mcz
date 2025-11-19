@@ -10,6 +10,8 @@ pub fn main() !void {
     var conn = try Connection.new();
     conn.init();
 
+    try conn.postToChat("Hello!");
+
     try conn.setPlayerPosition(.{ .x = 4, .y = 27, .z = 8 });
 
     const player = try conn.getPlayerPosition();

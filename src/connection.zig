@@ -45,8 +45,14 @@ pub const Connection = struct {
         self.reader = self.stream.reader(&self.read_buffer);
     }
 
+    pub fn postToChat(self: *Self, message: []const u8) !void {
+        // FIXME: Sanitize message
+        try self.writer.interface.print("chat.post({s})\n", .{message});
+        try self.writer.interface.flush();
+    }
+
     pub fn getPlayerPosition(self: *Self) !Coordinate {
-        try self.writer.interface.writeAll("player.getPos()\n");
+        try self.writer.interface.print("player.getPos()\n", .{});
         try self.writer.interface.flush();
 
         const data = try self.reader.interface().takeDelimiterInclusive('\n');
