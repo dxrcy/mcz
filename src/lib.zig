@@ -2,6 +2,8 @@ const connection = @import("connection.zig");
 pub const Connection = connection.Connection;
 pub const BlockStream = connection.BlockStream;
 
+pub const blocks = @import("blocks.zig");
+
 pub const Coordinate = struct {
     const Self = @This();
 
