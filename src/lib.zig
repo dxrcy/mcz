@@ -1,9 +1,9 @@
 const std = @import("std");
 const Io = std.Io;
 
-const connection = @import("connection.zig");
-pub const Connection = connection.Connection;
-pub const BlockStream = connection.BlockStream;
+pub const Connection = @import("Connection.zig");
+pub const BlockStream = Connection.BlockStream;
+pub const HeightStream = Connection.HeightStream;
 
 pub const blocks = @import("blocks.zig");
 
