@@ -1,4 +1,5 @@
 const std = @import("std");
+const Io = std.Io;
 const net = std.net;
 
 const lib = @import("lib.zig");
@@ -22,15 +23,22 @@ pub const Connection = struct {
     write_buffer: [WRITE_BUFFER_SIZE]u8,
     read_buffer: [READ_BUFFER_SIZE]u8,
 
-    // TODO: Add explicit error variants to function returns
+    pub const NewError =
+        net.TcpConnectToAddressError ||
+        error{InvalidIPAddressFormat};
+
+    pub const RequestError =
+        Io.Writer.Error ||
+        Io.Reader.Error ||
+        IntegerIter.Error;
 
     /// Must call `init` after creation, to initialize writer/reader with
     /// correct internal references.
-    pub fn new() !Self {
+    pub fn new() NewError!Self {
         const ip = "127.0.0.1";
         const port = 4711;
-        const addr = try net.Address.parseIp(ip, port);
 
+        const addr = try net.Address.parseIp(ip, port);
         const conn = try net.tcpConnectToAddress(addr);
 
         return Self{
@@ -47,21 +55,21 @@ pub const Connection = struct {
         self.reader = self.stream.reader(&self.read_buffer);
     }
 
-    pub fn postToChat(self: *Self, message: []const u8) !void {
+    pub fn postToChat(self: *Self, message: []const u8) RequestError!void {
         try self.writer.interface.print("chat.post(", .{});
         try self.writeSanitizedString(message);
         try self.writer.interface.print(")\n", .{});
         try self.writer.interface.flush();
     }
 
-    pub fn doCommand(self: *Self, command: []const u8) !void {
+    pub fn doCommand(self: *Self, command: []const u8) RequestError!void {
         try self.writer.interface.print("player.doCommand(", .{});
         try self.writeSanitizedString(command);
         try self.writer.interface.print(")\n", .{});
         try self.writer.interface.flush();
     }
 
-    fn writeSanitizedString(self: *Self, string: []const u8) !void {
+    fn writeSanitizedString(self: *Self, string: []const u8) RequestError!void {
         // Server parses based on newlines (0x0a). All other characters,
         // including comma, semicolon, and arbitrary UTF-8 should be safe.
         for (string) |char| {
@@ -71,8 +79,11 @@ pub const Connection = struct {
         }
     }
 
-    pub fn getPlayerPosition(self: *Self) !Coordinate {
-        try self.writer.interface.print("player.getPos()\n", .{});
+    pub fn getPlayerPosition(self: *Self) RequestError!Coordinate {
+        try self.writer.interface.print(
+            "player.getPos()\n",
+            .{},
+        );
         try self.writer.interface.flush();
 
         const data = try self.reader.interface().takeDelimiterInclusive('\n');
@@ -84,7 +95,10 @@ pub const Connection = struct {
         return Coordinate{ .x = x, .y = y, .z = z };
     }
 
-    pub fn setPlayerPosition(self: *Self, coordinate: Coordinate) !void {
+    pub fn setPlayerPosition(
+        self: *Self,
+        coordinate: Coordinate,
+    ) RequestError!void {
         try self.writer.interface.print(
             "player.setPos({},{},{})\n",
             .{ coordinate.x, coordinate.y, coordinate.z },
@@ -92,7 +106,7 @@ pub const Connection = struct {
         try self.writer.interface.flush();
     }
 
-    pub fn getBlock(self: *Self, coordinate: Coordinate) !Block {
+    pub fn getBlock(self: *Self, coordinate: Coordinate) RequestError!Block {
         try self.writer.interface.print(
             "world.getBlockWithData({},{},{})\n",
             .{ coordinate.x, coordinate.y, coordinate.z },
@@ -107,7 +121,11 @@ pub const Connection = struct {
         return Block{ .id = id, .mod = mod };
     }
 
-    pub fn setBlock(self: *Self, coordinate: Coordinate, block: Block) !void {
+    pub fn setBlock(
+        self: *Self,
+        coordinate: Coordinate,
+        block: Block,
+    ) RequestError!void {
         try self.writer.interface.print(
             "world.setBlock({},{},{},{},{})\n",
             .{
@@ -122,7 +140,7 @@ pub const Connection = struct {
         self: *Self,
         origin: Coordinate,
         bound: Coordinate,
-    ) !BlockStream {
+    ) RequestError!BlockStream {
         try self.writer.interface.print(
             "world.getBlocksWithData({},{},{},{},{},{})\n",
             .{
@@ -145,7 +163,7 @@ pub const Connection = struct {
         origin: Coordinate,
         bound: Coordinate,
         block: Block,
-    ) !void {
+    ) RequestError!void {
         try self.writer.interface.print(
             "world.setBlocks({},{},{},{},{},{},{},{})\n",
             .{
@@ -157,7 +175,7 @@ pub const Connection = struct {
         try self.writer.interface.flush();
     }
 
-    pub fn getHeight(self: *Self, coordinate: Coordinate2D) !i32 {
+    pub fn getHeight(self: *Self, coordinate: Coordinate2D) RequestError!i32 {
         try self.writer.interface.print(
             "world.getHeight({},{})\n",
             .{ coordinate.x, coordinate.z },
@@ -167,15 +185,14 @@ pub const Connection = struct {
         const data = try self.reader.interface().takeDelimiterInclusive('\n');
         var integers = IntegerIter.new(data);
 
-        const height = try integers.next(i32, '\n');
-        return height;
+        return try integers.next(i32, '\n');
     }
 
     pub fn getHeights(
         self: *Self,
         origin: Coordinate2D,
         bound: Coordinate2D,
-    ) !HeightStream {
+    ) RequestError!HeightStream {
         try self.writer.interface.print(
             "world.getHeights({},{},{},{})\n",
             .{
@@ -202,7 +219,7 @@ pub const BlockStream = struct {
     size: Size,
     index: usize,
 
-    pub fn next(self: *Self) !?Block {
+    pub fn next(self: *Self) Connection.RequestError!?Block {
         if (self.is_at_end()) {
             return null;
         }
@@ -232,7 +249,7 @@ pub const HeightStream = struct {
     size: Size2D,
     index: usize,
 
-    pub fn next(self: *Self) !?i32 {
+    pub fn next(self: *Self) Connection.RequestError!?i32 {
         if (self.is_at_end()) {
             return null;
         }
@@ -243,8 +260,7 @@ pub const HeightStream = struct {
         const data = try self.connection.reader.interface().takeDelimiterInclusive(delim);
         var integers = IntegerIter.new(data);
 
-        const height = try integers.next(i32, delim);
-        return height;
+        return try integers.next(i32, delim);
     }
 
     fn is_at_end(self: *const Self) bool {

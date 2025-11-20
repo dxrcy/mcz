@@ -8,6 +8,14 @@ pub const IntegerIter = struct {
     buffer: []const u8,
     index: usize,
 
+    pub const Error = error{
+        Fail,
+        UnexpectedEof,
+        UnexpectedChar,
+        MalformedValue,
+        Overflow,
+    };
+
     /// Requires that slice is properly terminated with appropriate delimiter.
     pub fn new(slice: []const u8) Self {
         return Self{
@@ -15,14 +23,6 @@ pub const IntegerIter = struct {
             .index = 0,
         };
     }
-
-    const Error = error{
-        Fail,
-        UnexpectedEof,
-        UnexpectedChar,
-        MalformedValue,
-        Overflow,
-    };
 
     /// Does not consume / increase index.
     fn nextByte(self: *const Self) Error!u8 {
