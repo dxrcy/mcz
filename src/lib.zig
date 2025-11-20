@@ -79,6 +79,10 @@ pub const Block = struct {
     id: u32,
     mod: u32,
 
+    pub fn with_mod(self: Self, mod: u32) Self {
+        return Self{ .id = self.id, .mod = mod };
+    }
+
     /// Get name of block matching `id` **and** `mod`.
     ///
     /// Note that, since `mod` can either represent a "different block" (eg.
