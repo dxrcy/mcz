@@ -46,11 +46,28 @@ pub const Size = struct {
     pub fn flat(self: Self) Size2D {
         return Size2D{ .x = self.x, .z = self.z };
     }
+
+    pub fn between(origin: Coordinate, bound: Coordinate) Self {
+        return Self{
+            .x = @abs(origin.x - bound.x) + 1,
+            .y = @abs(origin.y - bound.y) + 1,
+            .z = @abs(origin.z - bound.z) + 1,
+        };
+    }
 };
 
 pub const Size2D = struct {
+    const Self = @This();
+
     x: u32,
     z: u32,
+
+    pub fn between(origin: Coordinate2D, bound: Coordinate2D) Self {
+        return Self{
+            .x = @abs(origin.x - bound.x) + 1,
+            .z = @abs(origin.z - bound.z) + 1,
+        };
+    }
 };
 
 pub const Block = struct {

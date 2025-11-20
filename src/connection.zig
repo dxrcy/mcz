@@ -110,7 +110,10 @@ pub const Connection = struct {
     pub fn setBlock(self: *Self, coordinate: Coordinate, block: Block) !void {
         try self.writer.interface.print(
             "world.setBlock({},{},{},{},{})\n",
-            .{ coordinate.x, coordinate.y, coordinate.z, block.id, block.mod },
+            .{
+                coordinate.x, coordinate.y, coordinate.z,
+                block.id,     block.mod,
+            },
         );
         try self.writer.interface.flush();
     }
@@ -129,16 +132,10 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        const size = Size{
-            .x = (@abs(origin.x - bound.x) + 1),
-            .y = (@abs(origin.y - bound.y) + 1),
-            .z = (@abs(origin.z - bound.z) + 1),
-        };
-
         return BlockStream{
             .connection = self,
             .origin = origin,
-            .size = size,
+            .size = Size.between(origin, bound),
             .index = 0,
         };
     }
@@ -188,15 +185,10 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        const size = Size2D{
-            .x = (@abs(origin.x - bound.x) + 1),
-            .z = (@abs(origin.z - bound.z) + 1),
-        };
-
         return HeightStream{
             .connection = self,
             .origin = origin,
-            .size = size,
+            .size = Size2D.between(origin, bound),
             .index = 0,
         };
     }
@@ -228,8 +220,7 @@ pub const BlockStream = struct {
     }
 
     fn is_at_end(self: *const Self) bool {
-        const length = self.size.x * self.size.y * self.size.z;
-        return self.index >= length;
+        return self.index >= (self.size.x * self.size.y * self.size.z);
     }
 };
 
@@ -257,7 +248,6 @@ pub const HeightStream = struct {
     }
 
     fn is_at_end(self: *const Self) bool {
-        const length = self.size.x * self.size.z;
-        return self.index >= length;
+        return self.index >= (self.size.x * self.size.z);
     }
 };
