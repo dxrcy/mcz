@@ -30,7 +30,8 @@ pub const Connection = struct {
     pub const RequestError =
         Io.Writer.Error ||
         Io.Reader.Error ||
-        IntegerIter.Error;
+        IntegerIter.Error ||
+        error{StreamTooLong};
 
     /// Must call `init` after creation, to initialize writer/reader with
     /// correct internal references.
@@ -53,6 +54,11 @@ pub const Connection = struct {
     pub fn init(self: *Self) void {
         self.writer = self.stream.writer(&self.write_buffer);
         self.reader = self.stream.reader(&self.read_buffer);
+    }
+
+    fn recvNext(self: *Self, delimiter: u8) RequestError!IntegerIter {
+        const data = try self.reader.interface().takeDelimiterInclusive(delimiter);
+        return IntegerIter.new(data);
     }
 
     pub fn postToChat(self: *Self, message: []const u8) RequestError!void {
@@ -86,12 +92,12 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        const data = try self.reader.interface().takeDelimiterInclusive('\n');
-        var integers = IntegerIter.new(data);
-
+        var integers = try self.recvNext('\n');
         const x = try integers.next(i32, ',');
         const y = try integers.next(i32, ',');
         const z = try integers.next(i32, '\n');
+        // TODO: Assert end of data (and elswhere)
+
         return Coordinate{ .x = x, .y = y, .z = z };
     }
 
@@ -113,11 +119,10 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        const data = try self.reader.interface().takeDelimiterInclusive('\n');
-        var integers = IntegerIter.new(data);
-
+        var integers = try self.recvNext('\n');
         const id = try integers.next(u32, ',');
         const mod = try integers.next(u32, '\n');
+
         return Block{ .id = id, .mod = mod };
     }
 
@@ -182,9 +187,7 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        const data = try self.reader.interface().takeDelimiterInclusive('\n');
-        var integers = IntegerIter.new(data);
-
+        var integers = try self.recvNext('\n');
         return try integers.next(i32, '\n');
     }
 
@@ -227,9 +230,7 @@ pub const BlockStream = struct {
 
         const delim: u8 = if (self.is_at_end()) '\n' else ';';
 
-        const data = try self.connection.reader.interface().takeDelimiterInclusive(delim);
-        var integers = IntegerIter.new(data);
-
+        var integers = try self.connection.recvNext(delim);
         const id = try integers.next(u32, ',');
         const mod = try integers.next(u32, delim);
 
@@ -257,9 +258,7 @@ pub const HeightStream = struct {
 
         const delim: u8 = if (self.is_at_end()) '\n' else ',';
 
-        const data = try self.connection.reader.interface().takeDelimiterInclusive(delim);
-        var integers = IntegerIter.new(data);
-
+        var integers = try self.connection.recvNext(delim);
         return try integers.next(i32, delim);
     }
 
