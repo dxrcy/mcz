@@ -5,6 +5,7 @@ const math = std.math;
 
 const mcz = @import("mcz");
 const Connection = mcz.Connection;
+const Coordinate = mcz.Coordinate;
 
 pub fn main() !void {
     var conn = try Connection.new();
@@ -20,43 +21,41 @@ pub fn main() !void {
     });
 
     const player = try conn.getPlayerPosition();
+    const tile = player.add(.{ .x = 0, .y = -1, .z = 0 });
     debug.print("player: {},{},{}\n", player);
-
-    const tile = mcz.Coordinate{
-        .x = player.x,
-        .y = player.y - 1,
-        .z = player.z,
-    };
 
     try conn.setBlock(tile, .{ .id = 1, .mod = 0 });
 
-    const height = try conn.getHeight(player.flat());
-    debug.print("height: {}\n", .{height});
-
-    const block = try conn.getBlock(tile);
-    debug.print("block: {}:{}\n", block);
-
-    var blocks = try conn.getBlocks(
-        .{ .x = 0, .y = 90, .z = 0 },
-        .{ .x = 1, .y = 91, .z = -1 },
-    );
-    debug.print("blocks:\n", .{});
-    while (try blocks.next()) |b| {
-        debug.print("  - {}:{}\n", b);
+    {
+        const height = try conn.getHeight(player.flat());
+        debug.print("height: {}\n", .{height});
+    }
+    {
+        const block = try conn.getBlock(tile);
+        debug.print("block: {}:{}\n", block);
     }
 
-    var heights = try conn.getHeights(
-        .{ .x = 0, .z = 0 },
-        .{ .x = 1, .z = -1 },
-    );
-    debug.print("heights:\n", .{});
-    while (try heights.next()) |h| {
-        debug.print("  - {}\n", .{h});
+    {
+        const origin = Coordinate{ .x = 0, .y = 90, .z = 0 };
+        const bound = origin.add(.{ .x = 1, .y = 1, .z = -1 });
+
+        var blocks = try conn.getBlocks(origin, bound);
+        debug.print("blocks:\n", .{});
+        while (try blocks.next()) |block| {
+            debug.print("  - {}:{}\n", block);
+        }
+
+        var heights = try conn.getHeights(origin.flat(), bound.flat());
+        debug.print("heights:\n", .{});
+        while (try heights.next()) |height| {
+            debug.print("  - {}\n", .{height});
+        }
     }
 
-    try conn.setBlocks(
-        .{ .x = 3, .y = 90, .z = 0 },
-        .{ .x = 4, .y = 91, .z = -1 },
-        .{ .id = 3, .mod = 0 },
-    );
+    {
+        const origin = Coordinate{ .x = 3, .y = 90, .z = 0 };
+        const bound = origin.add(.{ .x = 1, .y = 1, .z = -1 });
+
+        try conn.setBlocks(origin, bound, .{ .id = 3, .mod = 0 });
+    }
 }

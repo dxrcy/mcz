@@ -12,11 +12,28 @@ pub const Coordinate = struct {
     pub fn flat(self: Self) Coordinate2D {
         return Coordinate2D{ .x = self.x, .z = self.z };
     }
+
+    pub fn add(lhs: Self, rhs: Self) Self {
+        return Self{
+            .x = lhs.x + rhs.x,
+            .y = lhs.y + rhs.y,
+            .z = lhs.z + rhs.z,
+        };
+    }
 };
 
 pub const Coordinate2D = struct {
+    const Self = @This();
+
     x: i32,
     z: i32,
+
+    pub fn add(lhs: Self, rhs: Self) Self {
+        return Self{
+            .x = lhs.x + rhs.x,
+            .z = lhs.z + rhs.z,
+        };
+    }
 };
 
 pub const Size = struct {
