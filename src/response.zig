@@ -38,6 +38,12 @@ pub const IntegerIter = struct {
         self.index += 1;
     }
 
+    pub fn expectEnd(self: *Self) Error!void {
+        if (self.index < self.buffer.len) {
+            return Error.UnexpectedChar;
+        }
+    }
+
     pub fn next(
         self: *Self,
         comptime Int: type,

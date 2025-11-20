@@ -92,11 +92,11 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        var integers = try self.recvNext('\n');
-        const x = try integers.next(i32, ',');
-        const y = try integers.next(i32, ',');
-        const z = try integers.next(i32, '\n');
-        // TODO: Assert end of data (and elswhere)
+        var response = try self.recvNext('\n');
+        const x = try response.next(i32, ',');
+        const y = try response.next(i32, ',');
+        const z = try response.next(i32, '\n');
+        try response.expectEnd();
 
         return Coordinate{ .x = x, .y = y, .z = z };
     }
@@ -119,9 +119,10 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        var integers = try self.recvNext('\n');
-        const id = try integers.next(u32, ',');
-        const mod = try integers.next(u32, '\n');
+        var response = try self.recvNext('\n');
+        const id = try response.next(u32, ',');
+        const mod = try response.next(u32, '\n');
+        try response.expectEnd();
 
         return Block{ .id = id, .mod = mod };
     }
@@ -187,8 +188,11 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        var integers = try self.recvNext('\n');
-        return try integers.next(i32, '\n');
+        var response = try self.recvNext('\n');
+        const height = try response.next(i32, '\n');
+        try response.expectEnd();
+
+        return height;
     }
 
     pub fn getHeights(
@@ -230,9 +234,10 @@ pub const BlockStream = struct {
 
         const delim: u8 = if (self.is_at_end()) '\n' else ';';
 
-        var integers = try self.connection.recvNext(delim);
-        const id = try integers.next(u32, ',');
-        const mod = try integers.next(u32, delim);
+        var response = try self.connection.recvNext(delim);
+        const id = try response.next(u32, ',');
+        const mod = try response.next(u32, delim);
+        try response.expectEnd();
 
         return Block{ .id = id, .mod = mod };
     }
@@ -258,8 +263,11 @@ pub const HeightStream = struct {
 
         const delim: u8 = if (self.is_at_end()) '\n' else ',';
 
-        var integers = try self.connection.recvNext(delim);
-        return try integers.next(i32, delim);
+        var response = try self.connection.recvNext(delim);
+        const height = try response.next(i32, delim);
+        try response.expectEnd();
+
+        return height;
     }
 
     fn is_at_end(self: *const Self) bool {
