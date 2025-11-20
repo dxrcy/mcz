@@ -13,6 +13,8 @@ const Block = lib.Block;
 
 const Response = @import("Response.zig");
 
+const DEFAULT_ADDRESS = net.Address.parseIp("127.0.0.1", 4711) catch unreachable;
+
 const WRITE_BUFFER_SIZE = 1024;
 const READ_BUFFER_SIZE = 1024;
 
@@ -21,10 +23,6 @@ writer: net.Stream.Writer,
 reader: net.Stream.Reader,
 write_buffer: [WRITE_BUFFER_SIZE]u8,
 read_buffer: [READ_BUFFER_SIZE]u8,
-
-pub const NewError =
-    net.TcpConnectToAddressError ||
-    error{InvalidIPAddressFormat};
 
 pub const MessageError =
     RequestError ||
@@ -40,15 +38,16 @@ pub const ResponseError =
 
 /// Must call `init` after creation, to initialize writer/reader with
 /// correct internal references.
-pub fn new() NewError!Self {
-    const ip = "127.0.0.1";
-    const port = 4711;
+pub fn new() net.TcpConnectToAddressError!Self {
+    return Self.withAddress(DEFAULT_ADDRESS);
+}
 
-    const addr = try net.Address.parseIp(ip, port);
-    const conn = try net.tcpConnectToAddress(addr);
-
+/// Must call `init` after creation, to initialize writer/reader with
+/// correct internal references.
+pub fn withAddress(addr: net.Address) net.TcpConnectToAddressError!Self {
+    const stream = try net.tcpConnectToAddress(addr);
     return Self{
-        .stream = conn,
+        .stream = stream,
         .writer = undefined,
         .reader = undefined,
         .write_buffer = undefined,
