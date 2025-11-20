@@ -30,6 +30,10 @@ pub const Coordinate2D = struct {
     x: i32,
     z: i32,
 
+    pub fn with_height(self: Self, height: i32) Coordinate {
+        return Coordinate{ .x = self.x, .y = height, .z = self.z };
+    }
+
     pub fn add(lhs: Self, rhs: Self) Self {
         return Self{
             .x = lhs.x + rhs.x,
@@ -63,6 +67,10 @@ pub const Size2D = struct {
 
     x: u32,
     z: u32,
+
+    pub fn with_height(self: Self, height: u32) Size {
+        return Size{ .x = self.x, .y = height, .z = self.z };
+    }
 
     pub fn between(origin: Coordinate2D, bound: Coordinate2D) Self {
         return Self{
