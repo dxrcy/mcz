@@ -30,7 +30,7 @@ pub fn main() !void {
 
     try conn.setBlock(tile, .{ .id = 1, .mod = 0 });
 
-    const height = try conn.getHeight(.{ .x = player.x, .z = player.z });
+    const height = try conn.getHeight(player.flat());
     debug.print("height: {}\n", .{height});
 
     const block = try conn.getBlock(tile);
