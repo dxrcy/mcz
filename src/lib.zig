@@ -7,6 +7,7 @@ pub const HeightStream = Connection.HeightStream;
 
 pub const blocks = @import("blocks.zig");
 
+/// A worldspace or offset coordinate in the Minecraft world.
 pub const Coordinate = struct {
     const Self = @This();
 
@@ -31,6 +32,7 @@ pub const Coordinate = struct {
     }
 };
 
+/// A worldspace or offset coordinate in the Minecraft world, with no `y`-value.
 pub const Coordinate2D = struct {
     const Self = @This();
 
@@ -53,6 +55,7 @@ pub const Coordinate2D = struct {
     }
 };
 
+/// 3D size of a cuboid, in blocks.
 pub const Size = struct {
     const Self = @This();
 
@@ -77,6 +80,7 @@ pub const Size = struct {
     }
 };
 
+/// 2D size of a rectangle, in blocks.
 pub const Size2D = struct {
     const Self = @This();
 
@@ -99,11 +103,14 @@ pub const Size2D = struct {
     }
 };
 
+/// A Minecraft block, including `id` and `mod`.
 pub const Block = struct {
     const Self = @This();
 
     // Fields must be larger than `u8` to hold newer blocks
+    /// Block identifier. Eg. 'Andesite' has id `1` (`1:5`).
     id: u32,
+    /// Block modifier. Eg. 'Andesite' has modifier `5` (`1:5`).
     mod: u32,
 
     pub fn with_mod(self: Self, mod: u32) Self {
