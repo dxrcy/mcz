@@ -9,7 +9,7 @@ const Size = lib.Size;
 const Size2D = lib.Size2D;
 const Block = lib.Block;
 
-const IntegerIter = @import("response.zig").IntegerIter;
+const Response = @import("Response.zig");
 
 pub const Connection = struct {
     const Self = @This();
@@ -30,7 +30,7 @@ pub const Connection = struct {
     pub const RequestError =
         Io.Writer.Error ||
         Io.Reader.Error ||
-        IntegerIter.Error ||
+        Response.Error ||
         error{StreamTooLong};
 
     /// Must call `init` after creation, to initialize writer/reader with
@@ -56,9 +56,9 @@ pub const Connection = struct {
         self.reader = self.stream.reader(&self.read_buffer);
     }
 
-    fn recvNext(self: *Self, delimiter: u8) RequestError!IntegerIter {
+    fn recvNext(self: *Self, delimiter: u8) RequestError!Response {
         const data = try self.reader.interface().takeDelimiterInclusive(delimiter);
-        return IntegerIter.new(data);
+        return Response.new(data);
     }
 
     pub fn postToChat(self: *Self, message: []const u8) RequestError!void {
