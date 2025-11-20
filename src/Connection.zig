@@ -141,6 +141,9 @@ pub fn setPlayerPosition(
 }
 
 /// Returns `Block` object from specified `Coordinate`.
+///
+/// **Do not use for large areas, it will be very slow**.
+/// Use `getBlocks` instead.
 pub fn getBlock(
     self: *Self,
     coordinate: Coordinate,
@@ -228,8 +231,8 @@ pub fn setBlocks(
 /// Returns the `y`-value of the highest solid block at the specified `x` and
 /// `z` coordinate
 ///
-/// **DO NOT USE FOR LARGE AREAS, IT WILL BE VERY SLOW** -- use `getHeights`
-/// instead.
+/// **Do not use for large areas, it will be very slow**.
+/// Use `getHeights` instead.
 pub fn getHeight(
     self: *Self,
     coordinate: Coordinate2D,
@@ -247,7 +250,7 @@ pub fn getHeight(
     return height;
 }
 
-/// Returns a collection of the heightss in rectangle specified by
+/// Returns a collection of the heights in rectangle specified by
 /// `Coordinate2D`s `origin` and `bound` (in any order).
 ///
 /// Streams response to avoid allocation.
