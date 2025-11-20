@@ -8,9 +8,19 @@ pub const Coordinate = struct {
     z: i32,
 };
 
+pub const Coordinate2D = struct {
+    x: i32,
+    z: i32,
+};
+
 pub const Size = struct {
     x: u32,
     y: u32,
+    z: u32,
+};
+
+pub const Size2D = struct {
+    x: u32,
     z: u32,
 };
 

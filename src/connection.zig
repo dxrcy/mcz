@@ -3,7 +3,9 @@ const net = std.net;
 
 const lib = @import("lib.zig");
 const Coordinate = lib.Coordinate;
+const Coordinate2D = lib.Coordinate2D;
 const Size = lib.Size;
+const Size2D = lib.Size2D;
 const Block = lib.Block;
 
 const IntegerIter = @import("response.zig").IntegerIter;
@@ -158,8 +160,7 @@ pub const Connection = struct {
         try self.writer.interface.flush();
     }
 
-    // TODO: Create `Coordinate2D` struct
-    pub fn getHeight(self: *Self, coordinate: Coordinate) !i32 {
+    pub fn getHeight(self: *Self, coordinate: Coordinate2D) !i32 {
         try self.writer.interface.print(
             "world.getHeight({},{})\n",
             .{ coordinate.x, coordinate.z },
@@ -175,8 +176,8 @@ pub const Connection = struct {
 
     pub fn getHeights(
         self: *Self,
-        origin: Coordinate,
-        bound: Coordinate,
+        origin: Coordinate2D,
+        bound: Coordinate2D,
     ) !HeightStream {
         try self.writer.interface.print(
             "world.getHeights({},{},{},{})\n",
@@ -187,10 +188,8 @@ pub const Connection = struct {
         );
         try self.writer.interface.flush();
 
-        // TODO: Create `Size2D` struct
-        const size = Size{
+        const size = Size2D{
             .x = (@abs(origin.x - bound.x) + 1),
-            .y = 1,
             .z = (@abs(origin.z - bound.z) + 1),
         };
 
@@ -238,8 +237,8 @@ pub const HeightStream = struct {
     const Self = @This();
 
     connection: *Connection,
-    origin: Coordinate,
-    size: Size,
+    origin: Coordinate2D,
+    size: Size2D,
     index: usize,
 
     pub fn next(self: *Self) !?i32 {
@@ -258,7 +257,7 @@ pub const HeightStream = struct {
     }
 
     fn is_at_end(self: *const Self) bool {
-        const length = self.size.x * self.size.y * self.size.z;
+        const length = self.size.x * self.size.z;
         return self.index >= length;
     }
 };
