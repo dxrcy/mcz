@@ -1,4 +1,5 @@
 const Self = @This();
+const Connection = Self;
 
 const std = @import("std");
 const Io = std.Io;
@@ -13,7 +14,8 @@ const Block = lib.Block;
 
 const Response = @import("Response.zig");
 
-const DEFAULT_ADDRESS = net.Address.parseIp("127.0.0.1", 4711) catch unreachable;
+/// Default address and port for [ELCI](https://github.com/rozukke/elci) server.
+pub const DEFAULT_ADDRESS = net.Address.parseIp("127.0.0.1", 4711) catch unreachable;
 
 const WRITE_BUFFER_SIZE = 1024;
 const READ_BUFFER_SIZE = 1024;
@@ -36,14 +38,16 @@ pub const ResponseError =
     Response.Error ||
     error{StreamTooLong};
 
-/// Must call `init` after creation, to initialize writer/reader with
-/// correct internal references.
+/// Create a new connection with `DEFAULT_ADDRESS`.
+///
+/// **Must call `init` after creation or relocation.**
 pub fn new() net.TcpConnectToAddressError!Self {
     return Self.withAddress(DEFAULT_ADDRESS);
 }
 
-/// Must call `init` after creation, to initialize writer/reader with
-/// correct internal references.
+/// Create a new connection with a specified server address.
+///
+/// **Must call `init` after creation or relocation.**
 pub fn withAddress(addr: net.Address) net.TcpConnectToAddressError!Self {
     const stream = try net.tcpConnectToAddress(addr);
     return Self{
@@ -55,6 +59,7 @@ pub fn withAddress(addr: net.Address) net.TcpConnectToAddressError!Self {
     };
 }
 
+/// Initialize writer and reader with correct internal references.
 pub fn init(self: *Self) void {
     self.writer = self.stream.writer(&self.write_buffer);
     self.reader = self.stream.reader(&self.read_buffer);
@@ -75,6 +80,9 @@ fn writeSanitizedString(self: *Self, string: []const u8) RequestError!void {
     }
 }
 
+/// Sends a message to the in-game chat.
+///
+/// Does **not** require that a player has joined.
 pub fn postToChat(
     self: *Self,
     message: []const u8,
@@ -85,6 +93,10 @@ pub fn postToChat(
     try self.writer.interface.flush();
 }
 
+/// Performs an in-game Minecraft command.
+///
+/// Players have to exist on the server and should be server operators (default
+/// with [ELCI](https://github.com/rozukke/elci)).
 pub fn doCommand(
     self: *Self,
     command: []const u8,
@@ -95,6 +107,8 @@ pub fn doCommand(
     try self.writer.interface.flush();
 }
 
+/// Returns a `Coordinate` representing player position (block position of lower
+/// half of playermodel).
 pub fn getPlayerPosition(
     self: *Self,
 ) MessageError!Coordinate {
@@ -113,6 +127,8 @@ pub fn getPlayerPosition(
     return Coordinate{ .x = x, .y = y, .z = z };
 }
 
+/// Sets player position (block position of lower half of playermodel) to
+/// specified `Coordinate`.
 pub fn setPlayerPosition(
     self: *Self,
     coordinate: Coordinate,
@@ -124,6 +140,7 @@ pub fn setPlayerPosition(
     try self.writer.interface.flush();
 }
 
+/// Returns `Block` object from specified `Coordinate`.
 pub fn getBlock(
     self: *Self,
     coordinate: Coordinate,
@@ -142,6 +159,7 @@ pub fn getBlock(
     return Block{ .id = id, .mod = mod };
 }
 
+/// Sets block at `Coordinate` to specified `Block`.
 pub fn setBlock(
     self: *Self,
     coordinate: Coordinate,
@@ -157,6 +175,15 @@ pub fn setBlock(
     try self.writer.interface.flush();
 }
 
+/// Returns a collection of the `Block`s in cuboid specified by `Coordinate`s
+/// `origin` and `bound` (in any order).
+///
+/// Streams response to avoid allocation.
+///
+/// Note this means all blocks have to be read before other responses can be
+/// read from the server; i.e. any subsequently-called method which reads a
+/// server response (eg. `getBlock`) will block until *this* response is
+/// completely read (when `BlockStream.next()` yeilds `null`).
 pub fn getBlocks(
     self: *Self,
     origin: Coordinate,
@@ -179,6 +206,8 @@ pub fn getBlocks(
     };
 }
 
+/// Sets a cuboid of blocks to all be the specified `Block`, with the corners of
+/// the cuboid specified by `Coordinate`s `origin` and `bound` (in any order).
 pub fn setBlocks(
     self: *Self,
     origin: Coordinate,
@@ -196,6 +225,11 @@ pub fn setBlocks(
     try self.writer.interface.flush();
 }
 
+/// Returns the `y`-value of the highest solid block at the specified `x` and
+/// `z` coordinate
+///
+/// **DO NOT USE FOR LARGE AREAS, IT WILL BE VERY SLOW** -- use `getHeights`
+/// instead.
 pub fn getHeight(
     self: *Self,
     coordinate: Coordinate2D,
@@ -213,6 +247,15 @@ pub fn getHeight(
     return height;
 }
 
+/// Returns a collection of the heightss in rectangle specified by
+/// `Coordinate2D`s `origin` and `bound` (in any order).
+///
+/// Streams response to avoid allocation.
+///
+/// Note this means all blocks have to be read before other responses can be
+/// read from the server; i.e. any subsequently-called method which reads a
+/// server response (eg. `getBlock`) will block until *this* response is
+/// completely read (when `BlockStream.next()` yeilds `null`).
 pub fn getHeights(
     self: *Self,
     origin: Coordinate2D,
@@ -235,9 +278,11 @@ pub fn getHeights(
     };
 }
 
+/// A stream of `Block`s in a cuboid, returned by `Connection.getBlocks`.
+///
+/// **Mutating or relocating the parent `Connection` invalidates an instance of
+/// this type.**
 pub const BlockStream = struct {
-    const Connection = Self;
-
     connection: *Connection,
     origin: Coordinate,
     size: Size,
@@ -264,9 +309,11 @@ pub const BlockStream = struct {
     }
 };
 
+/// A stream of heights in a rectangle, returned by `Connection.getHeights`.
+///
+/// **Mutating or relocating the parent `Connection` invalidates an instance of
+/// this type.**
 pub const HeightStream = struct {
-    const Connection = Self;
-
     connection: *Connection,
     origin: Coordinate2D,
     size: Size2D,
