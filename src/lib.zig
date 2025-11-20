@@ -1,3 +1,6 @@
+const std = @import("std");
+const Io = std.Io;
+
 const connection = @import("connection.zig");
 pub const Connection = connection.Connection;
 pub const BlockStream = connection.BlockStream;
@@ -22,6 +25,10 @@ pub const Coordinate = struct {
             .z = lhs.z + rhs.z,
         };
     }
+
+    pub fn format(self: Self, writer: *Io.Writer) Io.Writer.Error!void {
+        try writer.print("{},{},{}", .{ self.x, self.y, self.z });
+    }
 };
 
 pub const Coordinate2D = struct {
@@ -39,6 +46,10 @@ pub const Coordinate2D = struct {
             .x = lhs.x + rhs.x,
             .z = lhs.z + rhs.z,
         };
+    }
+
+    pub fn format(self: Self, writer: *Io.Writer) Io.Writer.Error!void {
+        try writer.print("{},{}", .{ self.x, self.z });
     }
 };
 
@@ -60,6 +71,10 @@ pub const Size = struct {
             .z = @abs(origin.z - bound.z) + 1,
         };
     }
+
+    pub fn format(self: Self, writer: *Io.Writer) Io.Writer.Error!void {
+        try writer.print("{}x{}x{}", .{ self.x, self.y, self.z });
+    }
 };
 
 pub const Size2D = struct {
@@ -77,6 +92,10 @@ pub const Size2D = struct {
             .x = @abs(origin.x - bound.x) + 1,
             .z = @abs(origin.z - bound.z) + 1,
         };
+    }
+
+    pub fn format(self: Self, writer: *Io.Writer) Io.Writer.Error!void {
+        try writer.print("{}x{}", .{ self.x, self.z });
     }
 };
 
@@ -123,5 +142,12 @@ pub const Block = struct {
             }
         }
         return null;
+    }
+
+    pub fn format(self: Self, writer: *Io.Writer) Io.Writer.Error!void {
+        try writer.print("{}:{}", .{ self.id, self.mod });
+        if (self.name_exact()) |name| {
+            try writer.print(" ({s})", .{name});
+        }
     }
 };

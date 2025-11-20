@@ -18,7 +18,7 @@ pub fn main() !void {
 
     const player = try conn.getPlayerPosition();
     const tile = player.add(.{ .x = 0, .y = -1, .z = 0 });
-    debug.print("player: {},{},{}\n", player);
+    debug.print("player: {f}\n", .{player});
 
     try conn.setBlock(tile, mcz.blocks.STONE);
 
@@ -28,12 +28,7 @@ pub fn main() !void {
     }
     {
         const block = try conn.getBlock(tile);
-        debug.print("  - {}:{} ({?s} / {?s})\n", .{
-            block.id,
-            block.mod,
-            block.name_any(),
-            block.name_exact(),
-        });
+        debug.print("block: {f}\n", .{block});
     }
 
     {
@@ -41,18 +36,13 @@ pub fn main() !void {
         const bound = origin.add(.{ .x = 1, .y = 1, .z = -1 });
 
         var blocks = try conn.getBlocks(origin, bound);
-        debug.print("blocks:\n", .{});
+        debug.print("blocks {f}:\n", .{blocks.size});
         while (try blocks.next()) |block| {
-            debug.print("  - {}:{} ({?s} / {?s})\n", .{
-                block.id,
-                block.mod,
-                block.name_any(),
-                block.name_exact(),
-            });
+            debug.print("  - {f}\n", .{block});
         }
 
         var heights = try conn.getHeights(origin.flat(), bound.flat());
-        debug.print("heights:\n", .{});
+        debug.print("heights {f}:\n", .{heights.size});
         while (try heights.next()) |height| {
             debug.print("  - {}\n", .{height});
         }
