@@ -26,9 +26,14 @@ pub const NewError =
     net.TcpConnectToAddressError ||
     error{InvalidIPAddressFormat};
 
-// TODO: Split into request/response
+pub const MessageError =
+    RequestError ||
+    ResponseError;
+
 pub const RequestError =
-    Io.Writer.Error ||
+    Io.Writer.Error;
+
+pub const ResponseError =
     Io.Reader.Error ||
     Response.Error ||
     error{StreamTooLong};
@@ -56,23 +61,9 @@ pub fn init(self: *Self) void {
     self.reader = self.stream.reader(&self.read_buffer);
 }
 
-fn recvNext(self: *Self, delimiter: u8) RequestError!Response {
+fn recvNext(self: *Self, delimiter: u8) ResponseError!Response {
     const data = try self.reader.interface().takeDelimiterInclusive(delimiter);
     return Response.new(data);
-}
-
-pub fn postToChat(self: *Self, message: []const u8) RequestError!void {
-    try self.writer.interface.print("chat.post(", .{});
-    try self.writeSanitizedString(message);
-    try self.writer.interface.print(")\n", .{});
-    try self.writer.interface.flush();
-}
-
-pub fn doCommand(self: *Self, command: []const u8) RequestError!void {
-    try self.writer.interface.print("player.doCommand(", .{});
-    try self.writeSanitizedString(command);
-    try self.writer.interface.print(")\n", .{});
-    try self.writer.interface.flush();
 }
 
 fn writeSanitizedString(self: *Self, string: []const u8) RequestError!void {
@@ -85,7 +76,29 @@ fn writeSanitizedString(self: *Self, string: []const u8) RequestError!void {
     }
 }
 
-pub fn getPlayerPosition(self: *Self) RequestError!Coordinate {
+pub fn postToChat(
+    self: *Self,
+    message: []const u8,
+) RequestError!void {
+    try self.writer.interface.print("chat.post(", .{});
+    try self.writeSanitizedString(message);
+    try self.writer.interface.print(")\n", .{});
+    try self.writer.interface.flush();
+}
+
+pub fn doCommand(
+    self: *Self,
+    command: []const u8,
+) RequestError!void {
+    try self.writer.interface.print("player.doCommand(", .{});
+    try self.writeSanitizedString(command);
+    try self.writer.interface.print(")\n", .{});
+    try self.writer.interface.flush();
+}
+
+pub fn getPlayerPosition(
+    self: *Self,
+) MessageError!Coordinate {
     try self.writer.interface.print(
         "player.getPos()\n",
         .{},
@@ -112,7 +125,10 @@ pub fn setPlayerPosition(
     try self.writer.interface.flush();
 }
 
-pub fn getBlock(self: *Self, coordinate: Coordinate) RequestError!Block {
+pub fn getBlock(
+    self: *Self,
+    coordinate: Coordinate,
+) MessageError!Block {
     try self.writer.interface.print(
         "world.getBlockWithData({},{},{})\n",
         .{ coordinate.x, coordinate.y, coordinate.z },
@@ -146,7 +162,7 @@ pub fn getBlocks(
     self: *Self,
     origin: Coordinate,
     bound: Coordinate,
-) RequestError!BlockStream {
+) MessageError!BlockStream {
     try self.writer.interface.print(
         "world.getBlocksWithData({},{},{},{},{},{})\n",
         .{
@@ -181,7 +197,10 @@ pub fn setBlocks(
     try self.writer.interface.flush();
 }
 
-pub fn getHeight(self: *Self, coordinate: Coordinate2D) RequestError!i32 {
+pub fn getHeight(
+    self: *Self,
+    coordinate: Coordinate2D,
+) MessageError!i32 {
     try self.writer.interface.print(
         "world.getHeight({},{})\n",
         .{ coordinate.x, coordinate.z },
@@ -225,7 +244,7 @@ pub const BlockStream = struct {
     size: Size,
     index: usize,
 
-    pub fn next(self: *BlockStream) RequestError!?Block {
+    pub fn next(self: *BlockStream) ResponseError!?Block {
         if (self.is_at_end()) {
             return null;
         }
@@ -254,7 +273,7 @@ pub const HeightStream = struct {
     size: Size2D,
     index: usize,
 
-    pub fn next(self: *HeightStream) RequestError!?i32 {
+    pub fn next(self: *HeightStream) ResponseError!?i32 {
         if (self.is_at_end()) {
             return null;
         }
