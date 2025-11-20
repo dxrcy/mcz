@@ -73,7 +73,43 @@ pub const Size2D = struct {
 };
 
 pub const Block = struct {
+    const Self = @This();
+
     // Fields must be larger than `u8` to hold newer blocks
     id: u32,
     mod: u32,
+
+    /// Get name of block matching `id` **and** `mod`.
+    ///
+    /// Note that, since `mod` can either represent a "different block" (eg.
+    /// stone slab vs wooden slab) or a "modified block" (eg. different
+    /// rotations), this method requires that `mod` values match exactly.
+    pub fn name_exact(self: Self) ?[]const u8 {
+        inline for (@typeInfo(blocks).@"struct".decls) |decl| {
+            const block = @field(blocks, decl.name);
+            if (self.id == block.id and self.mod == block.mod) {
+                return decl.name;
+            }
+        }
+        return null;
+    }
+
+    /// Get name of block matching `id` (even if `mod` differs).
+    ///
+    /// If an exact name exists (matching `id` **and** mod), then that is
+    /// returned.
+    /// Otherwise, find the first block (in declaration order) with a matching
+    /// `id`, without considering `mod`.
+    pub fn name_any(self: Self) ?[]const u8 {
+        if (self.name_exact()) |name| {
+            return name;
+        }
+        inline for (@typeInfo(blocks).@"struct".decls) |decl| {
+            const block = @field(blocks, decl.name);
+            if (self.id == block.id) {
+                return decl.name;
+            }
+        }
+        return null;
+    }
 };

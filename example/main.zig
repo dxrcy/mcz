@@ -28,7 +28,12 @@ pub fn main() !void {
     }
     {
         const block = try conn.getBlock(tile);
-        debug.print("block: {}:{}\n", block);
+        debug.print("  - {}:{} ({?s} / {?s})\n", .{
+            block.id,
+            block.mod,
+            block.name_any(),
+            block.name_exact(),
+        });
     }
 
     {
@@ -38,7 +43,12 @@ pub fn main() !void {
         var blocks = try conn.getBlocks(origin, bound);
         debug.print("blocks:\n", .{});
         while (try blocks.next()) |block| {
-            debug.print("  - {}:{}\n", block);
+            debug.print("  - {}:{} ({?s} / {?s})\n", .{
+                block.id,
+                block.mod,
+                block.name_any(),
+                block.name_exact(),
+            });
         }
 
         var heights = try conn.getHeights(origin.flat(), bound.flat());
