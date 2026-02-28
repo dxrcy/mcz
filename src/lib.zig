@@ -54,7 +54,7 @@ pub const Coordinate2D = struct {
     x: i32,
     z: i32,
 
-    pub fn with_height(self: Self, height: i32) Coordinate {
+    pub fn withHeight(self: Self, height: i32) Coordinate {
         return Coordinate{ .x = self.x, .y = height, .z = self.z };
     }
 
@@ -102,7 +102,7 @@ pub const Size2D = struct {
     x: u32,
     z: u32,
 
-    pub fn with_height(self: Self, height: u32) Size {
+    pub fn withHeight(self: Self, height: u32) Size {
         return Size{ .x = self.x, .y = height, .z = self.z };
     }
 
@@ -128,7 +128,7 @@ pub const Block = struct {
     /// Block modifier. Eg. 'Andesite' has modifier `5` (`1:5`).
     mod: u32,
 
-    pub fn with_mod(self: Self, mod: u32) Self {
+    pub fn withMod(self: Self, mod: u32) Self {
         return Self{ .id = self.id, .mod = mod };
     }
 
@@ -137,7 +137,7 @@ pub const Block = struct {
     /// Note that, since `mod` can either represent a "different block" (eg.
     /// stone slab vs wooden slab) or a "modified block" (eg. different
     /// rotations), this method requires that `mod` values match exactly.
-    pub fn name_exact(self: Self) ?[]const u8 {
+    pub fn nameExact(self: Self) ?[]const u8 {
         inline for (@typeInfo(blocks).@"struct".decls) |decl| {
             const block = @field(blocks, decl.name);
             if (self.id == block.id and self.mod == block.mod) {
@@ -153,8 +153,8 @@ pub const Block = struct {
     /// returned.
     /// Otherwise, find the first block (in declaration order) with a matching
     /// `id`, without considering `mod`.
-    pub fn name_any(self: Self) ?[]const u8 {
-        if (self.name_exact()) |name| {
+    pub fn nameAny(self: Self) ?[]const u8 {
+        if (self.nameExact()) |name| {
             return name;
         }
         inline for (@typeInfo(blocks).@"struct".decls) |decl| {
@@ -168,7 +168,7 @@ pub const Block = struct {
 
     pub fn format(self: Self, writer: *Io.Writer) Io.Writer.Error!void {
         try writer.print("{}:{}", .{ self.id, self.mod });
-        if (self.name_exact()) |name| {
+        if (self.nameExact()) |name| {
             try writer.print(" ({s})", .{name});
         }
     }

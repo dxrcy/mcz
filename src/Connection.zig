@@ -294,12 +294,12 @@ pub const BlockStream = struct {
     index: usize,
 
     pub fn next(self: *BlockStream) ResponseError!?Block {
-        if (self.is_at_end()) {
+        if (self.isAtEnd()) {
             return null;
         }
         self.index += 1;
 
-        const delim: u8 = if (self.is_at_end()) '\n' else ';';
+        const delim: u8 = if (self.isAtEnd()) '\n' else ';';
 
         var response = try self.connection.recvNext(delim);
         const id = try response.next(u32, ',');
@@ -309,7 +309,7 @@ pub const BlockStream = struct {
         return Block{ .id = id, .mod = mod };
     }
 
-    fn is_at_end(self: *const BlockStream) bool {
+    fn isAtEnd(self: *const BlockStream) bool {
         return self.index >= (self.size.x * self.size.y * self.size.z);
     }
 };
@@ -325,12 +325,12 @@ pub const HeightStream = struct {
     index: usize,
 
     pub fn next(self: *HeightStream) ResponseError!?i32 {
-        if (self.is_at_end()) {
+        if (self.isAtEnd()) {
             return null;
         }
         self.index += 1;
 
-        const delim: u8 = if (self.is_at_end()) '\n' else ',';
+        const delim: u8 = if (self.isAtEnd()) '\n' else ',';
 
         var response = try self.connection.recvNext(delim);
         const height = try response.next(i32, delim);
@@ -339,7 +339,7 @@ pub const HeightStream = struct {
         return height;
     }
 
-    fn is_at_end(self: *const HeightStream) bool {
+    fn isAtEnd(self: *const HeightStream) bool {
         return self.index >= (self.size.x * self.size.z);
     }
 };

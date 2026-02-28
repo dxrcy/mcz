@@ -52,12 +52,12 @@ pub fn next(
         @compileError("parameter must be an integer");
     }
 
-    const sign: Intermediate(Int) = switch (try self.take_sign_char()) {
+    const sign: Intermediate(Int) = switch (try self.takeSignChar()) {
         .negative => -1,
         .positive, .none => 1,
     };
 
-    const result = try self.take_digits_pre_decimal(Int);
+    const result = try self.takeDigitsPreDecimal(Int);
 
     if (result.length == 0) {
         // TODO: Move elsewhere?
@@ -78,7 +78,7 @@ pub fn next(
     // Decimal point and following digits
     if (try self.nextByte() == '.') {
         self.advanceByte();
-        const is_integer = try self.take_digits_post_decimal();
+        const is_integer = try self.takeDigitsPostDecimal();
         // Ensure number is always rounded down, NOT truncated
         // Without this, `-1.3` would become `-1` (instead of `-2`)
         if (!is_integer and sign < 0) {
@@ -106,7 +106,7 @@ fn Intermediate(comptime Int: type) type {
 
 /// Parses base-10 integer.
 /// Stops before first non-digit character, including decimal point.
-fn take_digits_pre_decimal(self: *Self, comptime Int: type) Error!struct {
+fn takeDigitsPreDecimal(self: *Self, comptime Int: type) Error!struct {
     value: Intermediate(Int),
     length: usize,
 } {
@@ -132,7 +132,7 @@ fn take_digits_pre_decimal(self: *Self, comptime Int: type) Error!struct {
 
 /// Returns `true` if any digits are non-zero, i.e. value is not an integer.
 /// Stops before first non-digit character.
-fn take_digits_post_decimal(self: *Self) Error!bool {
+fn takeDigitsPostDecimal(self: *Self) Error!bool {
     var is_integer = true;
     while (true) {
         switch (try self.nextByte()) {
@@ -145,7 +145,7 @@ fn take_digits_post_decimal(self: *Self) Error!bool {
     return is_integer;
 }
 
-fn take_sign_char(self: *Self) Error!enum { negative, positive, none } {
+fn takeSignChar(self: *Self) Error!enum { negative, positive, none } {
     switch (try self.nextByte()) {
         '-' => {
             self.advanceByte();
