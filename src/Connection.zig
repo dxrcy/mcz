@@ -16,14 +16,11 @@ const Response = @import("Response.zig");
 /// Default address and port for [ELCI](https://github.com/rozukke/elci) server.
 pub const DEFAULT_ADDRESS = net.IpAddress.parseIp4("127.0.0.1", 4711) catch unreachable;
 
-const WRITE_BUFFER_SIZE = 1024;
-const READ_BUFFER_SIZE = 1024;
-
 stream: net.Stream,
 writer: net.Stream.Writer,
 reader: net.Stream.Reader,
-write_buffer: [WRITE_BUFFER_SIZE]u8,
-read_buffer: [READ_BUFFER_SIZE]u8,
+write_buffer: []u8,
+read_buffer: []u8,
 io: Io,
 
 pub const MessageError =
@@ -41,29 +38,26 @@ pub const ResponseError =
 /// Create a new connection with `DEFAULT_ADDRESS`.
 ///
 /// **Must call `init` after creation or relocation.**
-pub fn new(io: Io) net.IpAddress.ConnectError!Connection {
-    return .withAddress(DEFAULT_ADDRESS, io);
+pub fn new(write_buffer: []u8, read_buffer: []u8, io: Io) net.IpAddress.ConnectError!Connection {
+    return .withAddress(DEFAULT_ADDRESS, write_buffer, read_buffer, io);
 }
 
 /// Create a new connection with a specified server address.
-///
-/// **Must call `init` after creation or relocation.**
-pub fn withAddress(addr: net.IpAddress, io: Io) net.IpAddress.ConnectError!Connection {
+pub fn withAddress(
+    addr: net.IpAddress,
+    write_buffer: []u8,
+    read_buffer: []u8,
+    io: Io,
+) net.IpAddress.ConnectError!Connection {
     const stream = try addr.connect(io, .{ .mode = .stream });
     return .{
         .stream = stream,
-        .writer = undefined,
-        .reader = undefined,
-        .write_buffer = undefined,
-        .read_buffer = undefined,
+        .writer = stream.writer(io, write_buffer),
+        .reader = stream.reader(io, read_buffer),
+        .write_buffer = write_buffer,
+        .read_buffer = read_buffer,
         .io = io,
     };
-}
-
-/// Initialize writer and reader with correct internal references.
-pub fn init(connection: *Connection) void {
-    connection.writer = connection.stream.writer(connection.io, &connection.write_buffer);
-    connection.reader = connection.stream.reader(connection.io, &connection.read_buffer);
 }
 
 fn recvNext(connection: *Connection, delimiter: u8) ResponseError!Response {

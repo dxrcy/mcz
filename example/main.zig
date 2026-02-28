@@ -8,8 +8,10 @@ const Connection = mcz.Connection;
 const Coordinate = mcz.Coordinate;
 
 pub fn main(init: std.process.Init) !void {
-    var conn = try Connection.new(init.io);
-    conn.init();
+    var write_buffer: [1024]u8 = undefined;
+    var read_buffer: [1024]u8 = undefined;
+
+    var conn: Connection = try .new(&write_buffer, &read_buffer, init.io);
 
     try conn.postToChat("Hello!");
     try conn.doCommand("say Hello!");
