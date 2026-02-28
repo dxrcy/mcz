@@ -7,8 +7,8 @@ const mcz = @import("mcz");
 const Connection = mcz.Connection;
 const Coordinate = mcz.Coordinate;
 
-pub fn main() !void {
-    var conn = try Connection.new();
+pub fn main(init: std.process.Init) !void {
+    var conn = try Connection.new(init.io);
     conn.init();
 
     try conn.postToChat("Hello!");

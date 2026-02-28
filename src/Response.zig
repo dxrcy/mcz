@@ -101,10 +101,7 @@ fn Intermediate(comptime Int: type) type {
     if (info.signedness == .signed) {
         return Int;
     }
-    return @Type(std.builtin.Type{ .int = .{
-        .bits = info.bits + 1,
-        .signedness = .signed,
-    } });
+    return @Int(.signed, info.bits + 1);
 }
 
 /// Parses base-10 integer.

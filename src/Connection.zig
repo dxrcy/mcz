@@ -3,7 +3,7 @@ const Connection = Self;
 
 const std = @import("std");
 const Io = std.Io;
-const net = std.net;
+const net = Io.net;
 
 const lib = @import("lib.zig");
 const Coordinate = lib.Coordinate;
@@ -15,7 +15,7 @@ const Block = lib.Block;
 const Response = @import("Response.zig");
 
 /// Default address and port for [ELCI](https://github.com/rozukke/elci) server.
-pub const DEFAULT_ADDRESS = net.Address.parseIp("127.0.0.1", 4711) catch unreachable;
+pub const DEFAULT_ADDRESS = net.IpAddress.parseIp4("127.0.0.1", 4711) catch unreachable;
 
 const WRITE_BUFFER_SIZE = 1024;
 const READ_BUFFER_SIZE = 1024;
@@ -25,6 +25,7 @@ writer: net.Stream.Writer,
 reader: net.Stream.Reader,
 write_buffer: [WRITE_BUFFER_SIZE]u8,
 read_buffer: [READ_BUFFER_SIZE]u8,
+io: Io,
 
 pub const MessageError =
     RequestError ||
@@ -41,32 +42,33 @@ pub const ResponseError =
 /// Create a new connection with `DEFAULT_ADDRESS`.
 ///
 /// **Must call `init` after creation or relocation.**
-pub fn new() net.TcpConnectToAddressError!Self {
-    return Self.withAddress(DEFAULT_ADDRESS);
+pub fn new(io: Io) net.IpAddress.ConnectError!Self {
+    return Self.withAddress(DEFAULT_ADDRESS, io);
 }
 
 /// Create a new connection with a specified server address.
 ///
 /// **Must call `init` after creation or relocation.**
-pub fn withAddress(addr: net.Address) net.TcpConnectToAddressError!Self {
-    const stream = try net.tcpConnectToAddress(addr);
+pub fn withAddress(addr: net.IpAddress, io: Io) net.IpAddress.ConnectError!Self {
+    const stream = try addr.connect(io, .{ .mode = .stream });
     return Self{
         .stream = stream,
         .writer = undefined,
         .reader = undefined,
         .write_buffer = undefined,
         .read_buffer = undefined,
+        .io = io,
     };
 }
 
 /// Initialize writer and reader with correct internal references.
 pub fn init(self: *Self) void {
-    self.writer = self.stream.writer(&self.write_buffer);
-    self.reader = self.stream.reader(&self.read_buffer);
+    self.writer = self.stream.writer(self.io, &self.write_buffer);
+    self.reader = self.stream.reader(self.io, &self.read_buffer);
 }
 
 fn recvNext(self: *Self, delimiter: u8) ResponseError!Response {
-    const data = try self.reader.interface().takeDelimiterInclusive(delimiter);
+    const data = try self.reader.interface.takeDelimiterInclusive(delimiter);
     return Response.new(data);
 }
 
