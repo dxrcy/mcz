@@ -22,7 +22,7 @@ pub fn main(init: std.process.Init) !void {
     const tile = player.add(.{ .x = 0, .y = -1, .z = 0 });
     debug.print("player: {f}\n", .{player});
 
-    try conn.setBlock(tile, mcz.blocks.STONE);
+    try conn.setBlock(tile, mcz.blocks.stone);
 
     {
         const height = try conn.getHeight(player.flat());
@@ -54,6 +54,6 @@ pub fn main(init: std.process.Init) !void {
         const origin = Coordinate{ .x = 3, .y = 90, .z = 0 };
         const bound = origin.add(.{ .x = 1, .y = 1, .z = -1 });
 
-        try conn.setBlocks(origin, bound, mcz.blocks.DIRT);
+        try conn.setBlocks(origin, bound, mcz.blocks.dirt);
     }
 }
