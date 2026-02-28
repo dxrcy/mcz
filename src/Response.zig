@@ -17,30 +17,26 @@ pub const Error = error{
 
 /// Requires that slice is properly terminated with appropriate delimiter.
 pub fn new(slice: []const u8) Response {
-    return Response{
-        .buffer = slice,
-        .index = 0,
-    };
+    return .{ .buffer = slice, .index = 0 };
 }
 
 /// Does not consume / increase index.
 fn nextByte(response: *const Response) Error!u8 {
-    if (response.index >= response.buffer.len) {
+    if (response.index >= response.buffer.len)
         return Error.UnexpectedEof;
-    }
     return response.buffer[response.index];
 }
 
 /// Asserts not at EOF.
 fn advanceByte(response: *Response) void {
-    _ = response.nextByte() catch unreachable;
+    _ = response.nextByte() catch
+        unreachable;
     response.index += 1;
 }
 
 pub fn expectEnd(response: *Response) Error!void {
-    if (response.index < response.buffer.len) {
+    if (response.index < response.buffer.len)
         return Error.UnexpectedChar;
-    }
 }
 
 pub fn next(
@@ -48,9 +44,8 @@ pub fn next(
     comptime Int: type,
     expected_delim: u8,
 ) Error!Int {
-    if (@typeInfo(Int) != .int) {
+    if (@typeInfo(Int) != .int)
         @compileError("parameter must be an integer");
-    }
 
     const sign: Intermediate(Int) = switch (try response.takeSignChar()) {
         .negative => -1,
@@ -81,27 +76,24 @@ pub fn next(
         const is_integer = try response.takeDigitsPostDecimal();
         // Ensure number is always rounded down, NOT truncated
         // Without this, `-1.3` would become `-1` (instead of `-2`)
-        if (!is_integer and sign < 0) {
+        if (!is_integer and sign < 0)
             value = try math.sub(Intermediate(Int), value, 1);
-        }
     }
 
     const delim = try response.nextByte();
     response.advanceByte();
-    if (delim != expected_delim) {
+    if (delim != expected_delim)
         return Error.UnexpectedChar;
-    }
 
     return math.cast(Int, value) orelse Error.Overflow;
 }
 
-/// If `Int` is unsigned, return a larger signed integer with a sign bit.
 fn Intermediate(comptime Int: type) type {
     const info = @typeInfo(Int).int;
-    if (info.signedness == .signed) {
-        return Int;
-    }
-    return @Int(.signed, info.bits + 1);
+    return if (info.signedness == .signed)
+        Int
+    else
+        @Int(.signed, info.bits + 1);
 }
 
 /// Parses base-10 integer.

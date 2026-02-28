@@ -36,11 +36,11 @@ pub const Coordinate = struct {
     z: i32,
 
     pub fn flat(coordinate: Coordinate) Coordinate2D {
-        return Coordinate2D{ .x = coordinate.x, .z = coordinate.z };
+        return .{ .x = coordinate.x, .z = coordinate.z };
     }
 
     pub fn add(lhs: Coordinate, rhs: Coordinate) Coordinate {
-        return Coordinate{
+        return .{
             .x = lhs.x + rhs.x,
             .y = lhs.y + rhs.y,
             .z = lhs.z + rhs.z,
@@ -58,11 +58,11 @@ pub const Coordinate2D = struct {
     z: i32,
 
     pub fn withHeight(coordinate: Coordinate2D, height: i32) Coordinate {
-        return Coordinate{ .x = coordinate.x, .y = height, .z = coordinate.z };
+        return .{ .x = coordinate.x, .y = height, .z = coordinate.z };
     }
 
     pub fn add(lhs: Coordinate2D, rhs: Coordinate2D) Coordinate2D {
-        return Coordinate2D{
+        return .{
             .x = lhs.x + rhs.x,
             .z = lhs.z + rhs.z,
         };
@@ -84,7 +84,7 @@ pub const Size = struct {
     }
 
     pub fn between(origin: Coordinate, bound: Coordinate) Size {
-        return Size{
+        return .{
             .x = @abs(origin.x - bound.x) + 1,
             .y = @abs(origin.y - bound.y) + 1,
             .z = @abs(origin.z - bound.z) + 1,
@@ -102,11 +102,11 @@ pub const Size2D = struct {
     z: u32,
 
     pub fn withHeight(size: Size2D, height: u32) Size {
-        return Size{ .x = size.x, .y = height, .z = size.z };
+        return .{ .x = size.x, .y = height, .z = size.z };
     }
 
     pub fn between(origin: Coordinate2D, bound: Coordinate2D) Size2D {
-        return Size2D{
+        return .{
             .x = @abs(origin.x - bound.x) + 1,
             .z = @abs(origin.z - bound.z) + 1,
         };
@@ -126,7 +126,7 @@ pub const Block = struct {
     mod: u32,
 
     pub fn withMod(block: Block, mod: u32) Block {
-        return Block{ .id = block.id, .mod = mod };
+        return .{ .id = block.id, .mod = mod };
     }
 
     /// Get name of block matching `id` **and** `mod`.

@@ -42,7 +42,7 @@ pub const ResponseError =
 ///
 /// **Must call `init` after creation or relocation.**
 pub fn new(io: Io) net.IpAddress.ConnectError!Connection {
-    return Connection.withAddress(DEFAULT_ADDRESS, io);
+    return .withAddress(DEFAULT_ADDRESS, io);
 }
 
 /// Create a new connection with a specified server address.
@@ -50,7 +50,7 @@ pub fn new(io: Io) net.IpAddress.ConnectError!Connection {
 /// **Must call `init` after creation or relocation.**
 pub fn withAddress(addr: net.IpAddress, io: Io) net.IpAddress.ConnectError!Connection {
     const stream = try addr.connect(io, .{ .mode = .stream });
-    return Connection{
+    return .{
         .stream = stream,
         .writer = undefined,
         .reader = undefined,
@@ -68,7 +68,7 @@ pub fn init(connection: *Connection) void {
 
 fn recvNext(connection: *Connection, delimiter: u8) ResponseError!Response {
     const data = try connection.reader.interface.takeDelimiterInclusive(delimiter);
-    return Response.new(data);
+    return .new(data);
 }
 
 fn writeSanitizedString(connection: *Connection, string: []const u8) RequestError!void {
@@ -113,10 +113,7 @@ pub fn doCommand(
 pub fn getPlayerPosition(
     connection: *Connection,
 ) MessageError!Coordinate {
-    try connection.writer.interface.print(
-        "player.getPos()\n",
-        .{},
-    );
+    try connection.writer.interface.print("player.getPos()\n", .{});
     try connection.writer.interface.flush();
 
     var response = try connection.recvNext('\n');
@@ -125,7 +122,7 @@ pub fn getPlayerPosition(
     const z = try response.next(i32, '\n');
     try response.expectEnd();
 
-    return Coordinate{ .x = x, .y = y, .z = z };
+    return .{ .x = x, .y = y, .z = z };
 }
 
 /// Sets player position (block position of lower half of playermodel) to
@@ -160,7 +157,7 @@ pub fn getBlock(
     const mod = try response.next(u32, '\n');
     try response.expectEnd();
 
-    return Block{ .id = id, .mod = mod };
+    return .{ .id = id, .mod = mod };
 }
 
 /// Sets block at `Coordinate` to specified `Block`.
@@ -171,10 +168,7 @@ pub fn setBlock(
 ) RequestError!void {
     try connection.writer.interface.print(
         "world.setBlock({},{},{},{},{})\n",
-        .{
-            coordinate.x, coordinate.y, coordinate.z,
-            block.id,     block.mod,
-        },
+        .{ coordinate.x, coordinate.y, coordinate.z, block.id, block.mod },
     );
     try connection.writer.interface.flush();
 }
@@ -202,10 +196,10 @@ pub fn getBlocks(
     );
     try connection.writer.interface.flush();
 
-    return BlockStream{
+    return .{
         .connection = connection,
         .origin = origin,
-        .size = Size.between(origin, bound),
+        .size = .between(origin, bound),
         .index = 0,
     };
 }
@@ -267,17 +261,14 @@ pub fn getHeights(
 ) RequestError!HeightStream {
     try connection.writer.interface.print(
         "world.getHeights({},{},{},{})\n",
-        .{
-            origin.x, origin.z,
-            bound.x,  bound.z,
-        },
+        .{ origin.x, origin.z, bound.x, bound.z },
     );
     try connection.writer.interface.flush();
 
-    return HeightStream{
+    return .{
         .connection = connection,
         .origin = origin,
-        .size = Size2D.between(origin, bound),
+        .size = .between(origin, bound),
         .index = 0,
     };
 }
@@ -293,9 +284,8 @@ pub const BlockStream = struct {
     index: usize,
 
     pub fn next(stream: *BlockStream) ResponseError!?Block {
-        if (stream.isAtEnd()) {
+        if (stream.isAtEnd())
             return null;
-        }
         stream.index += 1;
 
         const delim: u8 = if (stream.isAtEnd()) '\n' else ';';
@@ -305,7 +295,7 @@ pub const BlockStream = struct {
         const mod = try response.next(u32, delim);
         try response.expectEnd();
 
-        return Block{ .id = id, .mod = mod };
+        return .{ .id = id, .mod = mod };
     }
 
     fn isAtEnd(stream: *const BlockStream) bool {
@@ -324,9 +314,8 @@ pub const HeightStream = struct {
     index: usize,
 
     pub fn next(stream: *HeightStream) ResponseError!?i32 {
-        if (stream.isAtEnd()) {
+        if (stream.isAtEnd())
             return null;
-        }
         stream.index += 1;
 
         const delim: u8 = if (stream.isAtEnd()) '\n' else ',';
