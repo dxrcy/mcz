@@ -22,6 +22,13 @@ pub const HeightStream = Connection.HeightStream;
 
 pub const blocks = @import("blocks.zig");
 
+const BLOCK_ARRAY = blk: {
+    var array: [@typeInfo(blocks).@"struct".decls.len]struct { []const u8, Block } = undefined;
+    for (@typeInfo(blocks).@"struct".decls, 0..) |decl, i|
+        array[i] = .{ decl.name, @field(blocks, decl.name) };
+    break :blk array;
+};
+
 /// A worldspace or offset coordinate in the Minecraft world.
 pub const Coordinate = struct {
     x: i32,
@@ -128,11 +135,10 @@ pub const Block = struct {
     /// stone slab vs wooden slab) or a "modified block" (eg. different
     /// rotations), this method requires that `mod` values match exactly.
     pub fn nameExact(block: Block) ?[]const u8 {
-        inline for (@typeInfo(blocks).@"struct".decls) |decl| {
-            const item = @field(blocks, decl.name);
-            if (block.id == item.id and block.mod == item.mod) {
-                return decl.name;
-            }
+        for (BLOCK_ARRAY) |item| {
+            const name, const value = item;
+            if (block.id == value.id and block.mod == value.mod)
+                return name;
         }
         return null;
     }
@@ -147,11 +153,10 @@ pub const Block = struct {
         if (block.nameExact()) |name| {
             return name;
         }
-        inline for (@typeInfo(blocks).@"struct".decls) |decl| {
-            const item = @field(blocks, decl.name);
-            if (block.id == item.id) {
-                return decl.name;
-            }
+        for (BLOCK_ARRAY) |item| {
+            const name, const value = item;
+            if (block.id == value.id)
+                return name;
         }
         return null;
     }
