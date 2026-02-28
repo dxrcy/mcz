@@ -34,7 +34,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     {
-        const origin = Coordinate{ .x = 0, .y = 90, .z = 0 };
+        const origin: Coordinate = .{ .x = 0, .y = 90, .z = 0 };
         const bound = origin.add(.{ .x = 1, .y = 1, .z = -1 });
 
         var blocks = try conn.getBlocks(origin, bound);
@@ -51,7 +51,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     {
-        const origin = Coordinate{ .x = 3, .y = 90, .z = 0 };
+        const origin: Coordinate = .{ .x = 3, .y = 90, .z = 0 };
         const bound = origin.add(.{ .x = 1, .y = 1, .z = -1 });
 
         try conn.setBlocks(origin, bound, mcz.blocks.dirt);

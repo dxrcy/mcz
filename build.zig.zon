@@ -1,0 +1,12 @@
+.{
+    .name = .mcz,
+    .version = "0.1.0",
+    .minimum_zig_version = "0.16.0-dev.2670+56253d9e3",
+    .fingerprint = 0x414e2127420ffc92,
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
