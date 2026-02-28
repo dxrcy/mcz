@@ -1,5 +1,4 @@
-const Self = @This();
-const Connection = Self;
+const Connection = @This();
 
 const std = @import("std");
 const Io = std.Io;
@@ -42,16 +41,16 @@ pub const ResponseError =
 /// Create a new connection with `DEFAULT_ADDRESS`.
 ///
 /// **Must call `init` after creation or relocation.**
-pub fn new(io: Io) net.IpAddress.ConnectError!Self {
-    return Self.withAddress(DEFAULT_ADDRESS, io);
+pub fn new(io: Io) net.IpAddress.ConnectError!Connection {
+    return Connection.withAddress(DEFAULT_ADDRESS, io);
 }
 
 /// Create a new connection with a specified server address.
 ///
 /// **Must call `init` after creation or relocation.**
-pub fn withAddress(addr: net.IpAddress, io: Io) net.IpAddress.ConnectError!Self {
+pub fn withAddress(addr: net.IpAddress, io: Io) net.IpAddress.ConnectError!Connection {
     const stream = try addr.connect(io, .{ .mode = .stream });
-    return Self{
+    return Connection{
         .stream = stream,
         .writer = undefined,
         .reader = undefined,
@@ -62,21 +61,21 @@ pub fn withAddress(addr: net.IpAddress, io: Io) net.IpAddress.ConnectError!Self 
 }
 
 /// Initialize writer and reader with correct internal references.
-pub fn init(self: *Self) void {
-    self.writer = self.stream.writer(self.io, &self.write_buffer);
-    self.reader = self.stream.reader(self.io, &self.read_buffer);
+pub fn init(connection: *Connection) void {
+    connection.writer = connection.stream.writer(connection.io, &connection.write_buffer);
+    connection.reader = connection.stream.reader(connection.io, &connection.read_buffer);
 }
 
-fn recvNext(self: *Self, delimiter: u8) ResponseError!Response {
-    const data = try self.reader.interface.takeDelimiterInclusive(delimiter);
+fn recvNext(connection: *Connection, delimiter: u8) ResponseError!Response {
+    const data = try connection.reader.interface.takeDelimiterInclusive(delimiter);
     return Response.new(data);
 }
 
-fn writeSanitizedString(self: *Self, string: []const u8) RequestError!void {
+fn writeSanitizedString(connection: *Connection, string: []const u8) RequestError!void {
     // Server parses based on newlines (0x0a). All other characters,
     // including comma, semicolon, and arbitrary UTF-8 should be safe.
     for (string) |char| {
-        try self.writer.interface.print("{c}", .{
+        try connection.writer.interface.print("{c}", .{
             if (char == '\n') ' ' else char,
         });
     }
@@ -86,13 +85,13 @@ fn writeSanitizedString(self: *Self, string: []const u8) RequestError!void {
 ///
 /// Does **not** require that a player has joined.
 pub fn postToChat(
-    self: *Self,
+    connection: *Connection,
     message: []const u8,
 ) RequestError!void {
-    try self.writer.interface.print("chat.post(", .{});
-    try self.writeSanitizedString(message);
-    try self.writer.interface.print(")\n", .{});
-    try self.writer.interface.flush();
+    try connection.writer.interface.print("chat.post(", .{});
+    try connection.writeSanitizedString(message);
+    try connection.writer.interface.print(")\n", .{});
+    try connection.writer.interface.flush();
 }
 
 /// Performs an in-game Minecraft command.
@@ -100,27 +99,27 @@ pub fn postToChat(
 /// Players have to exist on the server and should be server operators (default
 /// with [ELCI](https://github.com/rozukke/elci)).
 pub fn doCommand(
-    self: *Self,
+    connection: *Connection,
     command: []const u8,
 ) RequestError!void {
-    try self.writer.interface.print("player.doCommand(", .{});
-    try self.writeSanitizedString(command);
-    try self.writer.interface.print(")\n", .{});
-    try self.writer.interface.flush();
+    try connection.writer.interface.print("player.doCommand(", .{});
+    try connection.writeSanitizedString(command);
+    try connection.writer.interface.print(")\n", .{});
+    try connection.writer.interface.flush();
 }
 
 /// Returns a `Coordinate` representing player position (block position of lower
 /// half of playermodel).
 pub fn getPlayerPosition(
-    self: *Self,
+    connection: *Connection,
 ) MessageError!Coordinate {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "player.getPos()\n",
         .{},
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 
-    var response = try self.recvNext('\n');
+    var response = try connection.recvNext('\n');
     const x = try response.next(i32, ',');
     const y = try response.next(i32, ',');
     const z = try response.next(i32, '\n');
@@ -132,14 +131,14 @@ pub fn getPlayerPosition(
 /// Sets player position (block position of lower half of playermodel) to
 /// specified `Coordinate`.
 pub fn setPlayerPosition(
-    self: *Self,
+    connection: *Connection,
     coordinate: Coordinate,
 ) RequestError!void {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "player.setPos({},{},{})\n",
         .{ coordinate.x, coordinate.y, coordinate.z },
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 }
 
 /// Returns `Block` object from specified `Coordinate`.
@@ -147,16 +146,16 @@ pub fn setPlayerPosition(
 /// **Do not use for large areas, it will be very slow**.
 /// Use `getBlocks` instead.
 pub fn getBlock(
-    self: *Self,
+    connection: *Connection,
     coordinate: Coordinate,
 ) MessageError!Block {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "world.getBlockWithData({},{},{})\n",
         .{ coordinate.x, coordinate.y, coordinate.z },
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 
-    var response = try self.recvNext('\n');
+    var response = try connection.recvNext('\n');
     const id = try response.next(u32, ',');
     const mod = try response.next(u32, '\n');
     try response.expectEnd();
@@ -166,18 +165,18 @@ pub fn getBlock(
 
 /// Sets block at `Coordinate` to specified `Block`.
 pub fn setBlock(
-    self: *Self,
+    connection: *Connection,
     coordinate: Coordinate,
     block: Block,
 ) RequestError!void {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "world.setBlock({},{},{},{},{})\n",
         .{
             coordinate.x, coordinate.y, coordinate.z,
             block.id,     block.mod,
         },
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 }
 
 /// Returns a collection of the `Block`s in cuboid specified by `Coordinate`s
@@ -190,21 +189,21 @@ pub fn setBlock(
 /// server response (eg. `getBlock`) will block until *this* response is
 /// completely read (when `BlockStream.next()` yeilds `null`).
 pub fn getBlocks(
-    self: *Self,
+    connection: *Connection,
     origin: Coordinate,
     bound: Coordinate,
 ) MessageError!BlockStream {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "world.getBlocksWithData({},{},{},{},{},{})\n",
         .{
             origin.x, origin.y, origin.z,
             bound.x,  bound.y,  bound.z,
         },
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 
     return BlockStream{
-        .connection = self,
+        .connection = connection,
         .origin = origin,
         .size = Size.between(origin, bound),
         .index = 0,
@@ -214,12 +213,12 @@ pub fn getBlocks(
 /// Sets a cuboid of blocks to all be the specified `Block`, with the corners of
 /// the cuboid specified by `Coordinate`s `origin` and `bound` (in any order).
 pub fn setBlocks(
-    self: *Self,
+    connection: *Connection,
     origin: Coordinate,
     bound: Coordinate,
     block: Block,
 ) RequestError!void {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "world.setBlocks({},{},{},{},{},{},{},{})\n",
         .{
             origin.x, origin.y,  origin.z,
@@ -227,7 +226,7 @@ pub fn setBlocks(
             block.id, block.mod,
         },
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 }
 
 /// Returns the `y`-value of the highest solid block at the specified `x` and
@@ -236,16 +235,16 @@ pub fn setBlocks(
 /// **Do not use for large areas, it will be very slow**.
 /// Use `getHeights` instead.
 pub fn getHeight(
-    self: *Self,
+    connection: *Connection,
     coordinate: Coordinate2D,
 ) MessageError!i32 {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "world.getHeight({},{})\n",
         .{ coordinate.x, coordinate.z },
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 
-    var response = try self.recvNext('\n');
+    var response = try connection.recvNext('\n');
     const height = try response.next(i32, '\n');
     try response.expectEnd();
 
@@ -262,21 +261,21 @@ pub fn getHeight(
 /// server response (eg. `getBlock`) will block until *this* response is
 /// completely read (when `BlockStream.next()` yeilds `null`).
 pub fn getHeights(
-    self: *Self,
+    connection: *Connection,
     origin: Coordinate2D,
     bound: Coordinate2D,
 ) RequestError!HeightStream {
-    try self.writer.interface.print(
+    try connection.writer.interface.print(
         "world.getHeights({},{},{},{})\n",
         .{
             origin.x, origin.z,
             bound.x,  bound.z,
         },
     );
-    try self.writer.interface.flush();
+    try connection.writer.interface.flush();
 
     return HeightStream{
-        .connection = self,
+        .connection = connection,
         .origin = origin,
         .size = Size2D.between(origin, bound),
         .index = 0,
@@ -293,15 +292,15 @@ pub const BlockStream = struct {
     size: Size,
     index: usize,
 
-    pub fn next(self: *BlockStream) ResponseError!?Block {
-        if (self.isAtEnd()) {
+    pub fn next(stream: *BlockStream) ResponseError!?Block {
+        if (stream.isAtEnd()) {
             return null;
         }
-        self.index += 1;
+        stream.index += 1;
 
-        const delim: u8 = if (self.isAtEnd()) '\n' else ';';
+        const delim: u8 = if (stream.isAtEnd()) '\n' else ';';
 
-        var response = try self.connection.recvNext(delim);
+        var response = try stream.connection.recvNext(delim);
         const id = try response.next(u32, ',');
         const mod = try response.next(u32, delim);
         try response.expectEnd();
@@ -309,8 +308,8 @@ pub const BlockStream = struct {
         return Block{ .id = id, .mod = mod };
     }
 
-    fn isAtEnd(self: *const BlockStream) bool {
-        return self.index >= (self.size.x * self.size.y * self.size.z);
+    fn isAtEnd(stream: *const BlockStream) bool {
+        return stream.index >= (stream.size.x * stream.size.y * stream.size.z);
     }
 };
 
@@ -324,22 +323,22 @@ pub const HeightStream = struct {
     size: Size2D,
     index: usize,
 
-    pub fn next(self: *HeightStream) ResponseError!?i32 {
-        if (self.isAtEnd()) {
+    pub fn next(stream: *HeightStream) ResponseError!?i32 {
+        if (stream.isAtEnd()) {
             return null;
         }
-        self.index += 1;
+        stream.index += 1;
 
-        const delim: u8 = if (self.isAtEnd()) '\n' else ',';
+        const delim: u8 = if (stream.isAtEnd()) '\n' else ',';
 
-        var response = try self.connection.recvNext(delim);
+        var response = try stream.connection.recvNext(delim);
         const height = try response.next(i32, delim);
         try response.expectEnd();
 
         return height;
     }
 
-    fn isAtEnd(self: *const HeightStream) bool {
-        return self.index >= (self.size.x * self.size.z);
+    fn isAtEnd(stream: *const HeightStream) bool {
+        return stream.index >= (stream.size.x * stream.size.z);
     }
 };

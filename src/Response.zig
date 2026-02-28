@@ -1,4 +1,4 @@
-const Self = @This();
+const Response = @This();
 
 const std = @import("std");
 const assert = std.debug.assert;
@@ -16,35 +16,35 @@ pub const Error = error{
 };
 
 /// Requires that slice is properly terminated with appropriate delimiter.
-pub fn new(slice: []const u8) Self {
-    return Self{
+pub fn new(slice: []const u8) Response {
+    return Response{
         .buffer = slice,
         .index = 0,
     };
 }
 
 /// Does not consume / increase index.
-fn nextByte(self: *const Self) Error!u8 {
-    if (self.index >= self.buffer.len) {
+fn nextByte(response: *const Response) Error!u8 {
+    if (response.index >= response.buffer.len) {
         return Error.UnexpectedEof;
     }
-    return self.buffer[self.index];
+    return response.buffer[response.index];
 }
 
 /// Asserts not at EOF.
-fn advanceByte(self: *Self) void {
-    _ = self.nextByte() catch unreachable;
-    self.index += 1;
+fn advanceByte(response: *Response) void {
+    _ = response.nextByte() catch unreachable;
+    response.index += 1;
 }
 
-pub fn expectEnd(self: *Self) Error!void {
-    if (self.index < self.buffer.len) {
+pub fn expectEnd(response: *Response) Error!void {
+    if (response.index < response.buffer.len) {
         return Error.UnexpectedChar;
     }
 }
 
 pub fn next(
-    self: *Self,
+    response: *Response,
     comptime Int: type,
     expected_delim: u8,
 ) Error!Int {
@@ -52,18 +52,18 @@ pub fn next(
         @compileError("parameter must be an integer");
     }
 
-    const sign: Intermediate(Int) = switch (try self.takeSignChar()) {
+    const sign: Intermediate(Int) = switch (try response.takeSignChar()) {
         .negative => -1,
         .positive, .none => 1,
     };
 
-    const result = try self.takeDigitsPreDecimal(Int);
+    const result = try response.takeDigitsPreDecimal(Int);
 
     if (result.length == 0) {
         // TODO: Move elsewhere?
         if (std.mem.eql(
             u8,
-            self.buffer[self.index..][0..4],
+            response.buffer[response.index..][0..4],
             "Fail",
         )) {
             return Error.Fail;
@@ -76,9 +76,9 @@ pub fn next(
     var value = try math.mul(Intermediate(Int), result.value, sign);
 
     // Decimal point and following digits
-    if (try self.nextByte() == '.') {
-        self.advanceByte();
-        const is_integer = try self.takeDigitsPostDecimal();
+    if (try response.nextByte() == '.') {
+        response.advanceByte();
+        const is_integer = try response.takeDigitsPostDecimal();
         // Ensure number is always rounded down, NOT truncated
         // Without this, `-1.3` would become `-1` (instead of `-2`)
         if (!is_integer and sign < 0) {
@@ -86,8 +86,8 @@ pub fn next(
         }
     }
 
-    const delim = try self.nextByte();
-    self.advanceByte();
+    const delim = try response.nextByte();
+    response.advanceByte();
     if (delim != expected_delim) {
         return Error.UnexpectedChar;
     }
@@ -106,7 +106,7 @@ fn Intermediate(comptime Int: type) type {
 
 /// Parses base-10 integer.
 /// Stops before first non-digit character, including decimal point.
-fn takeDigitsPreDecimal(self: *Self, comptime Int: type) Error!struct {
+fn takeDigitsPreDecimal(response: *Response, comptime Int: type) Error!struct {
     value: Intermediate(Int),
     length: usize,
 } {
@@ -114,14 +114,14 @@ fn takeDigitsPreDecimal(self: *Self, comptime Int: type) Error!struct {
     var length: usize = 0;
 
     while (true) : (length += 1) {
-        const char = try self.nextByte();
+        const char = try response.nextByte();
 
         const digit: Int = switch (char) {
             '0'...'9' => @intCast(char - '0'),
             else => break,
         };
 
-        self.advanceByte();
+        response.advanceByte();
 
         value = try math.mul(Intermediate(Int), value, 10);
         value = try math.add(Intermediate(Int), value, digit);
@@ -132,27 +132,27 @@ fn takeDigitsPreDecimal(self: *Self, comptime Int: type) Error!struct {
 
 /// Returns `true` if any digits are non-zero, i.e. value is not an integer.
 /// Stops before first non-digit character.
-fn takeDigitsPostDecimal(self: *Self) Error!bool {
+fn takeDigitsPostDecimal(response: *Response) Error!bool {
     var is_integer = true;
     while (true) {
-        switch (try self.nextByte()) {
+        switch (try response.nextByte()) {
             '0' => {},
             '1'...'9' => is_integer = false,
             else => break,
         }
-        self.advanceByte();
+        response.advanceByte();
     }
     return is_integer;
 }
 
-fn takeSignChar(self: *Self) Error!enum { negative, positive, none } {
-    switch (try self.nextByte()) {
+fn takeSignChar(response: *Response) Error!enum { negative, positive, none } {
+    switch (try response.nextByte()) {
         '-' => {
-            self.advanceByte();
+            response.advanceByte();
             return .negative;
         },
         '+' => {
-            self.advanceByte();
+            response.advanceByte();
             return .positive;
         },
         else => {
