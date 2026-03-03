@@ -75,15 +75,23 @@ fn writeSanitizedString(connection: *Connection, string: []const u8) RequestErro
     }
 }
 
-/// Sends a message to the in-game chat.
+/// Sends a string message to the in-game chat.
 ///
 /// Does **not** require that a player has joined.
-pub fn postToChat(
+pub fn postToChat(connection: *Connection, string: []const u8) RequestError!void {
+    return connection.postToChatFmt("{s}", .{string});
+}
+
+/// Sends a message to the in-game chat, formated with `std.fmt`.
+///
+/// Does **not** require that a player has joined.
+pub fn postToChatFmt(
     connection: *Connection,
-    message: []const u8,
+    comptime fmt: []const u8,
+    args: anytype,
 ) RequestError!void {
     try connection.writer.interface.print("chat.post(", .{});
-    try connection.writeSanitizedString(message);
+    try connection.writer.interface.print(fmt, args);
     try connection.writer.interface.print(")\n", .{});
     try connection.writer.interface.flush();
 }

@@ -14,6 +14,7 @@ pub fn main(init: std.process.Init) !void {
     var conn: Connection = try .new(&write_buffer, &read_buffer, init.io);
 
     try conn.postToChat("Hello!");
+    try conn.postToChatFmt("{}", .{.{ .formatted_tuple = 123 }});
     try conn.doCommand("say Hello!");
 
     try conn.setPlayerPosition(.{ .x = 4, .y = 87, .z = 8 });
