@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> **This repository has been permanently moved to
+> [codeberg.org/dxrcy/mcz](https://codeberg.org/dxrcy/mcz)**
+
 # MCZ (Minecraft-Zig)
 
 A Zig rewrite of [mcpp](https://github.com/rozukke/mcpp), a library to
